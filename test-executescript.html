@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>测试 executeScript 访问</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .box {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #result {
+      padding: 15px;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      margin-top: 20px;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>🔍 测试 executeScript 访问 window.ethereum</h1>
+    <p>这个页面会测试 <code>chrome.scripting.executeScript</code> 是否能访问页面主上下文的 <code>window.ethereum</code></p>
+
+    <button onclick="testExecuteScript()">测试 executeScript</button>
+    <button onclick="testDirectAccess()">测试直接访问</button>
+    <button onclick="compareResults()">对比结果</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    // 当前页面主上下文的检测结果
+    let directResult = null;
+    let executeScriptResult = null;
+
+    async function testDirectAccess() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.className = 'info';
+      resultDiv.textContent = '正在直接访问 window.ethereum...';
+
+      directResult = {
+        exists: typeof window.ethereum !== 'undefined',
+        type: typeof window.ethereum,
+        isMetaMask: window.ethereum?.isMetaMask,
+        chainId: window.ethereum?.chainId,
+        selectedAddress: window.ethereum?.selectedAddress,
+      };
+
+      let output = '✅ 直接访问结果（页面主上下文）：\n\n';
+      output += `typeof window.ethereum: ${directResult.type}\n`;
+      output += `isMetaMask: ${directResult.isMetaMask}\n`;
+      output += `chainId: ${directResult.chainId}\n`;
+      output += `selectedAddress: ${directResult.selectedAddress}\n`;
+
+      resultDiv.className = directResult.exists ? 'success' : 'error';
+      resultDiv.textContent = output;
+
+      console.log('[主上下文] 直接访问结果:', directResult);
+    }
+
+    async function testExecuteScript() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.className = 'info';
+      resultDiv.textContent = '正在通过 executeScript 测试...';
+
+      try {
+        // 通过 Background Script 调用 executeScript
+        const response = await chrome.runtime.sendMessage({
+          type: 'WEB3_REQUEST',
+          method: 'isMetaMask',
+          args: []
+        });
+
+        console.log('[测试] executeScript 响应:', response);
+
+        executeScriptResult = response;
+
+        let output = '📊 executeScript 结果：\n\n';
+        output += JSON.stringify(response, null, 2);
+
+        resultDiv.className = response?.success ? 'success' : 'error';
+        resultDiv.textContent = output;
+
+      } catch (error) {
+        resultDiv.className = 'error';
+        resultDiv.textContent = `❌ 错误: ${error.message}`;
+        console.error('[测试] 错误:', error);
+      }
+    }
+
+    function compareResults() {
+      const resultDiv = document.getElementById('result');
+
+      if (directResult === null) {
+        resultDiv.className = 'info';
+        resultDiv.textContent = '请先运行 "测试直接访问"';
+        return;
+      }
+
+      let output = '🔍 对比结果：\n\n';
+      output += '【直接访问】\n';
+      output += `  typeof window.ethereum: ${directResult.type}\n`;
+      output += `  exists: ${directResult.exists}\n`;
+      output += `  isMetaMask: ${directResult.isMetaMask}\n\n`;
+
+      if (executeScriptResult) {
+        output += '【executeScript】\n';
+        output += `  success: ${executeScriptResult.success}\n`;
+        output += `  result: ${executeScriptResult.result}\n`;
+        output += `  error: ${executeScriptResult.error}\n\n`;
+
+        const discrepancy = directResult.exists && !executeScriptResult.success;
+        if (discrepancy) {
+          output += '\n⚠️ 发现不一致！\n';
+          output += '直接访问可以检测到 window.ethereum，\n';
+          output += '但 executeScript 检测不到！\n\n';
+          output += '可能原因：\n';
+          output += '1. x.com 有特殊的脚本隔离机制\n';
+          output += '2. executeScript 执行在隔离世界中\n';
+          output += '3. 需要使用其他方法访问页面主上下文';
+          resultDiv.className = 'error';
+        } else {
+          output += '\n✅ 结果一致！';
+          resultDiv.className = 'success';
+        }
+      } else {
+        output += '\n请先运行 "测试 executeScript"';
+        resultDiv.className = 'info';
+      }
+
+      resultDiv.textContent = output;
+    }
+
+    // 页面加载时自动测试
+    window.addEventListener('load', async () => {
+      console.log('[测试] 页面加载完成');
+      console.log('[测试] 当前 URL:', window.location.href);
+
+      // 自动测试直接访问
+      await testDirectAccess();
+
+      // 等待 2 秒后自动测试 executeScript
+      setTimeout(async () => {
+        await testExecuteScript();
+        // 自动对比
+        setTimeout(() => {
+          compareResults();
+        }, 1000);
+      }, 2000);
+    });
+  </script>
+</body>
+</html>

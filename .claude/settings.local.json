@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm type-check:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm lint:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pnpm lint:fix:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm --filter @extension/content-ui exec tailwindcss:*)",
+      "Bash(pnpm exec tailwindcss:*)",
+      "Bash(DEBUG=*)",
+      "Bash(npx --yes tailwindcss:*)",
+      "Bash(pnpm which:*)",
+      "Bash(pnpm exec which:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(pnpm dlx tailwindcss:*)",
+      "Bash(node node_modules/tailwindcss/lib/cli.js:*)",
+      "Bash(powershell:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
+    ]
+  }
+}

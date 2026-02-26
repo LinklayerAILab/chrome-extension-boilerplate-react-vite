@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Turnstile</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="turnstile"></div>
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const sitekey = params.get('sitekey');
+        const action = params.get('action') || 'content-ui';
+        const theme = params.get('theme') || 'light';
+        let widgetId = null;
+
+        const notifyParent = (payload) => {
+          window.parent.postMessage(payload, '*');
+        };
+
+        window.__turnstileScriptError = () => {
+          notifyParent({
+            type: 'turnstile-debug',
+            message: 'turnstile-script-load-failed',
+          });
+        };
+
+        window.addEventListener('error', (event) => {
+          notifyParent({
+            type: 'turnstile-debug',
+            message: 'window-error',
+            detail: {
+              message: event.message,
+              filename: event.filename,
+              lineno: event.lineno,
+              colno: event.colno,
+            },
+          });
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+          notifyParent({
+            type: 'turnstile-debug',
+            message: 'unhandledrejection',
+            detail: event.reason ? String(event.reason) : 'unknown',
+          });
+        });
+
+        const renderTurnstile = () => {
+          if (!sitekey || widgetId !== null) return;
+          if (!window.turnstile || typeof window.turnstile.render !== 'function') return;
+          widgetId = window.turnstile.render('#turnstile', {
+            sitekey,
+            action,
+            theme,
+            size: 'invisible',
+            callback: (token) => {
+              notifyParent({ type: 'turnstile-token', token });
+            },
+            'error-callback': () => {
+              notifyParent({
+                type: 'turnstile-error',
+                detail: 'error-callback',
+              });
+            },
+            'expired-callback': () => {
+              notifyParent({
+                type: 'turnstile-expired',
+                detail: 'expired-callback',
+              });
+            },
+          });
+        };
+
+        window.addEventListener('message', (event) => {
+          const { data } = event;
+          if (!data || typeof data !== 'object') return;
+
+          if (data.type === 'turnstile-execute') {
+            if (widgetId === null) {
+              renderTurnstile();
+            }
+            if (window.turnstile && widgetId !== null) {
+              window.turnstile.execute(widgetId);
+            }
+          }
+
+          if (data.type === 'turnstile-reset') {
+            if (window.turnstile && widgetId !== null) {
+              window.turnstile.reset(widgetId);
+            }
+          }
+        });
+
+        const waitForTurnstile = (retries = 20) => {
+          if (window.turnstile && typeof window.turnstile.render === 'function') {
+            renderTurnstile();
+            notifyParent({ type: 'turnstile-ready' });
+            return;
+          }
+
+          if (retries <= 0) {
+            notifyParent({
+              type: 'turnstile-error',
+              detail: 'turnstile-not-ready',
+            });
+            return;
+          }
+
+          setTimeout(() => waitForTurnstile(retries - 1), 200);
+        };
+
+        window.renderTurnstile = waitForTurnstile;
+
+        notifyParent({ type: 'turnstile-frame-ready' });
+      })();
+    </script>
+    <script
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+      async
+      defer
+      onload="window.renderTurnstile && window.renderTurnstile()"
+      onerror="window.__turnstileScriptError && window.__turnstileScriptError()"
+    ></script>
+  </body>
+</html>

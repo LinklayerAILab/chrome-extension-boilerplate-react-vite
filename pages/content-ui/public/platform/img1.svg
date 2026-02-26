@@ -1,0 +1,19 @@
+              <svg
+                className="h-16px lg:h-18px"
+                viewBox="0 0 28 17"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M7.68627 0H13.0667L5.38039 16.8H0L7.68627 0Z"
+                  fill="black"
+                />
+                <path
+                  d="M15.1528 0H20.5332L12.8469 16.8H7.46655L15.1528 0Z"
+                  fill="black"
+                />
+                <path
+                  d="M22.8759 0H28.0001L20.6798 16.8H15.5557L22.8759 0Z"
+                  fill="#CCFF00"
+                />
+              </svg>

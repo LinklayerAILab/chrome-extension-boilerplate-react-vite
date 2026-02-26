@@ -21,7 +21,7 @@ const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
 const manifest = {
   manifest_version: 3,
   default_locale: 'en',
-  name: '__MSG_extensionName__',
+  name: 'LLA Agent',
   browser_specific_settings: {
     gecko: {
       id: 'example@example.com',
@@ -29,22 +29,29 @@ const manifest = {
     },
   },
   version: packageJson.version,
-  description: '__MSG_extensionDescription__',
+  description: 'Unlock Your Live Trading Data, Ignite Trading Social Connections — Powered by Agent Intelligence.',
   host_permissions: ['<all_urls>'],
-  permissions: ['storage', 'scripting', 'tabs', 'notifications', 'sidePanel'],
+  permissions: ['storage', 'scripting', 'tabs', 'notifications', 'sidePanel', 'offscreen'],
   options_page: 'options/index.html',
   background: {
     service_worker: 'background.js',
     type: 'module',
   },
   action: {
-    default_popup: 'popup/index.html',
-    default_icon: 'icon-34.png',
+    default_icon: {
+      '16': 'icon-16.png',
+      '32': 'icon-32.png',
+      '48': 'icon-48.png',
+      '128': 'icon-128.png',
+    },
   },
   chrome_url_overrides: {
     newtab: 'new-tab/index.html',
   },
   icons: {
+    '16': 'icon-16.png',
+    '32': 'icon-32.png',
+    '48': 'icon-48.png',
     '128': 'icon-128.png',
   },
   content_scripts: [
@@ -72,12 +79,21 @@ const manifest = {
   devtools_page: 'devtools/index.html',
   web_accessible_resources: [
     {
-      resources: ['*.js', '*.css', '*.svg', 'icon-128.png', 'icon-34.png'],
+      resources: ['*.js', '*.css', '*.svg', '*.html', 'icon-128.png', 'content-ui/*'],
       matches: ['*://*/*'],
     },
   ],
   side_panel: {
     default_path: 'side-panel/index.html',
+  },
+  sandbox: {
+    pages: ['content-ui/turnstile.html'],
+  },
+  content_security_policy: {
+    extension_pages:
+      "script-src 'self' 'wasm-unsafe-eval' http://localhost:* http://127.0.0.1:*; object-src 'self'; frame-src 'self' https://cdn.linklayer.ai",
+    sandbox:
+      "sandbox allow-scripts allow-forms; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; object-src 'self'",
   },
 } satisfies ManifestType;
 

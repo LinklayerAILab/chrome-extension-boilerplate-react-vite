@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MetaMask 注入诊断工具</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    h2 {
+      color: #666;
+      border-bottom: 2px solid #f6851b;
+      padding-bottom: 10px;
+    }
+    button {
+      background: #f6851b;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      margin: 5px;
+    }
+    button:hover {
+      background: #e6760f;
+    }
+    .status {
+      padding: 15px;
+      border-radius: 4px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    .checklist {
+      list-style: none;
+      padding: 0;
+    }
+    .checklist li {
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+    }
+    .checklist li.pass {
+      background: #d4edda;
+      color: #155724;
+    }
+    .checklist li.fail {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .checklist li::before {
+      content: '✓' or '✗';
+      font-weight: bold;
+      margin-right: 10px;
+      font-size: 18px;
+    }
+    .checklist li.pass::before {
+      content: '✅';
+    }
+    .checklist li.fail::before {
+      content: '❌';
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 MetaMask 注入诊断工具</h1>
+
+  <div class="section">
+    <h2>1. MetaMask 安装检查</h2>
+    <button onclick="checkMetaMaskInstallation()">检查 MetaMask 安装</button>
+    <button onclick="showMetaMaskSettings()">打开 MetaMask 设置</button>
+    <div id="installation-check"></div>
+  </div>
+
+  <div class="section">
+    <h2>2. 页面注入检查</h2>
+    <button onclick="checkPageInjection()">检查当前页面</button>
+    <button onclick="waitForInjection(5000)">等待 5 秒后重试</button>
+    <div id="injection-check"></div>
+  </div>
+
+  <div class="section">
+    <h2>3. 诊断清单</h2>
+    <button onclick="runDiagnostics()">运行完整诊断</button>
+    <div id="diagnostics"></div>
+  </div>
+
+  <div class="section">
+    <h2>4. 手动测试</h2>
+    <button onclick="testManualConnect()">测试连接</button>
+    <button onclick="showTroubleshooting()">显示故障排除指南</button>
+    <div id="manual-test"></div>
+  </div>
+
+  <script>
+    // ============================================
+    // 诊断函数
+    // ============================================
+
+    function showStatus(elementId, message, type = 'info') {
+      const element = document.getElementById(elementId);
+      const statusDiv = document.createElement('div');
+      statusDiv.className = `status ${type}`;
+      statusDiv.textContent = message;
+      element.insertBefore(statusDiv, element.firstChild);
+    }
+
+    function clearResults(elementId) {
+      document.getElementById(elementId).innerHTML = '';
+    }
+
+    function checkMetaMaskInstallation() {
+      clearResults('installation-check');
+      showStatus('installation-check', '检查 MetaMask 安装状态...', 'info');
+
+      setTimeout(() => {
+        const checks = [];
+
+        // 检查 1: navigator.plugins
+        const hasPlugin = navigator.plugins && Array.from(navigator.plugins).some(p =>
+          p.name.toLowerCase().includes('metamask')
+        );
+        checks.push({ name: 'MetaMask 插件已安装', pass: hasPlugin });
+
+        // 检查 2: window.ethereum
+        const hasEthereum = typeof window.ethereum !== 'undefined';
+        checks.push({ name: 'window.ethereum 存在', pass: hasEthereum });
+
+        // 显示结果
+        let html = '<ul class="checklist">';
+        checks.forEach(check => {
+          html += `<li class="${check.pass ? 'pass' : 'fail'}">${check.name}</li>`;
+        });
+        html += '</ul>';
+
+        if (hasEthereum) {
+          showStatus('installation-check', '✅ MetaMask 已安装并注入！' + html, 'success');
+        } else if (hasPlugin) {
+          showStatus('installation-check', '⚠️ MetaMask 插件已安装，但未注入到页面' + html, 'warning');
+          showStatus('installation-check', '\n可能原因：\n1. MetaMask 未解锁\n2. 页面需要刷新\n3. MetaMask 设置中禁用了此网站', 'warning');
+        } else {
+          showStatus('installation-check', '❌ 未检测到 MetaMask\n\n请访问 https://metamask.io 下载安装', 'error');
+        }
+      }, 100);
+    }
+
+    function checkPageInjection() {
+      clearResults('injection-check');
+      showStatus('injection-check', '检查页面注入状态...', 'info');
+
+      setTimeout(() => {
+        const details = {
+          URL: window.location.href,
+          'typeof window.ethereum': typeof window.ethereum,
+          'typeof window.web3': typeof window.web3,
+          'typeof window.web3.currentProvider': typeof window.web3?.currentProvider,
+        };
+
+        let html = '页面详情：\n\n';
+        for (const [key, value] of Object.entries(details)) {
+          html += `${key}: ${value}\n`;
+        }
+
+        if (typeof window.ethereum !== 'undefined') {
+          html += `\n✅ MetaMask 已注入到页面！\n`;
+          html += `isMetaMask: ${window.ethereum.isMetaMask}\n`;
+          html += `chainId: ${window.ethereum.chainId}\n`;
+          html += `selectedAddress: ${window.ethereum.selectedAddress || '未连接'}\n`;
+          showStatus('injection-check', html, 'success');
+        } else {
+          html += `\n❌ MetaMask 未注入到此页面\n\n`;
+          html += `可能的原因：\n`;
+          html += `1. MetaMask 未解锁\n`;
+          html += `2. 刷新页面（F5）\n`;
+          html += `3. 检查 MetaMask 设置 > 连接 > 已连接的网站\n`;
+          html += `4. 检查 MetaMask 设置 > 安全与隐私 > 清除标签页权限\n`;
+          showStatus('injection-check', html, 'error');
+        }
+      }, 100);
+    }
+
+    function waitForInjection(ms) {
+      clearResults('injection-check');
+      showStatus('injection-check', `等待 ${ms/1000} 秒后检查...`, 'info');
+
+      setTimeout(() => {
+        checkPageInjection();
+      }, ms);
+    }
+
+    function runDiagnostics() {
+      clearResults('diagnostics');
+      showStatus('diagnostics', '运行诊断...', 'info');
+
+      setTimeout(() => {
+        const checks = [];
+
+        // 检查 1: MetaMask 安装
+        const hasEthereum = typeof window.ethereum !== 'undefined';
+        checks.push({ name: 'MetaMask 已安装', pass: hasEthereum });
+
+        // 检查 2: isMetaMask
+        const isMetaMask = window.ethereum?.isMetaMask;
+        checks.push({ name: '是 MetaMask（不是其他钱包）', pass: isMetaMask });
+
+        // 检查 3: 是否解锁
+        const isUnlocked = window.ethereum?.isUnlocked?.();
+        checks.push({ name: 'MetaMask 已解锁', pass: isUnlocked });
+
+        // 检查 4: 是否已连接
+        const isConnected = window.ethereum?.isConnected?.();
+        checks.push({ name: '已连接到此页面', pass: isConnected });
+
+        // 检查 5: 是否有账户
+        const hasAccounts = window.ethereum?.selectedAddress;
+        checks.push({ name: '已授权账户', pass: hasAccounts });
+
+        // 显示结果
+        let html = '<ul class="checklist">';
+        let passed = 0;
+        checks.forEach(check => {
+          if (check.pass) passed++;
+          html += `<li class="${check.pass ? 'pass' : 'fail'}">${check.name}</li>`;
+        });
+        html += '</ul>';
+
+        html += `\n通过: ${passed}/${checks.length}`;
+
+        if (passed === checks.length) {
+          showStatus('diagnostics', '✅ 所有检查通过！' + html, 'success');
+        } else if (hasEthereum) {
+          showStatus('diagnostics', '⚠️ MetaMask 已安装，但未完全配置' + html, 'warning');
+        } else {
+          showStatus('diagnostics', '❌ MetaMask 未安装或未注入' + html, 'error');
+        }
+      }, 100);
+    }
+
+    async function testManualConnect() {
+      clearResults('manual-test');
+      showStatus('manual-test', '尝试连接 MetaMask...', 'info');
+
+      try {
+        if (typeof window.ethereum === 'undefined') {
+          showStatus('manual-test', '❌ window.ethereum 不存在，无法连接', 'error');
+          return;
+        }
+
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+        if (accounts && accounts.length > 0) {
+          showStatus('manual-test', `✅ 成功连接到账户: ${accounts[0]}`, 'success');
+        } else {
+          showStatus('manual-test', '⚠️ 未返回账户', 'warning');
+        }
+      } catch (error) {
+        showStatus('manual-test', `❌ 连接失败: ${error.message}`, 'error');
+      }
+    }
+
+    function showMetaMaskSettings() {
+      alert('请手动操作：\n\n1. 点击浏览器工具栏的 MetaMask 图标\n2. 点击设置图标（齿轮）\n3. 检查以下设置：\n   - 安全与隐私\n   - 连接\n   - 已连接的网站\n\n确保当前网站在允许列表中。');
+    }
+
+    function showTroubleshooting() {
+      clearResults('manual-test');
+      const guide = `故障排除指南：
+
+1. **确认 MetaMask 已解锁**
+   - 点击浏览器工具栏的 MetaMask 图标
+   - 输入密码解锁
+
+2. **刷新页面**
+   - 按 F5 或 Ctrl+R 刷新当前页面
+   - 有时 MetaMask 需要页面刷新才能注入
+
+3. **检查 MetaMask 权限设置**
+   - 打开 MetaMask
+   - 设置 > 安全与隐私
+   - 查看"自动锁定此账户"和"清除标签页权限"
+
+4. **重新连接网站**
+   - MetaMask > 设置 > 连接
+   - 移除当前网站
+   - 重新访问并连接
+
+5. **重启浏览器**
+   - 完全关闭浏览器
+   - 重新打开浏览器
+   - 重新访问页面
+
+6. **重新安装 MetaMask**
+   - 如果以上都不行，尝试重新安装 MetaMask
+
+7. **检查其他扩展冲突**
+   - 暂时禁用其他钱包扩展
+   - 只启用 MetaMask 测试`;
+
+      showStatus('manual-test', guide, 'info');
+    }
+
+    // 页面加载时自动检查
+    window.addEventListener('load', () => {
+      console.log('[Diagnostic] Page loaded');
+      checkMetaMaskInstallation();
+    });
+
+    // 持续监听
+    let checkCount = 0;
+    const maxChecks = 10;
+
+    const injectionCheckInterval = setInterval(() => {
+      if (typeof window.ethereum !== 'undefined') {
+        clearInterval(injectionCheckInterval);
+        console.log('[Diagnostic] MetaMask injected after', checkCount * 500, 'ms');
+        checkPageInjection();
+      } else if (checkCount >= maxChecks) {
+        clearInterval(injectionCheckInterval);
+        console.log('[Diagnostic] MetaMask not injected after', maxChecks * 500, 'ms');
+      } else {
+        checkCount++;
+        console.log('[Diagnostic] Waiting for MetaMask injection...', checkCount * 500, 'ms');
+      }
+    }, 500);
+  </script>
+</body>
+</html>

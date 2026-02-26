@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>注入诊断 - 实时监控</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .log-entry {
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      border-left: 3px solid #ddd;
+    }
+    .log-entry.info {
+      background: #d1ecf1;
+      border-color: #0c5460;
+    }
+    .log-entry.success {
+      background: #d4edda;
+      border-color: #155724;
+    }
+    .log-entry.error {
+      background: #f8d7da;
+      border-color: #721c24;
+    }
+    #log-container {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    button {
+      background: #f6851b;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #e6760f;
+    }
+    .status-box {
+      padding: 20px;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .status-box.found {
+      background: #d4edda;
+      color: #155724;
+      border: 2px solid #155724;
+    }
+    .status-box.not-found {
+      background: #f8d7da;
+      color: #721c24;
+      border: 2px solid #721c24;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 MetaMask 注入实时监控</h1>
+
+  <div class="section">
+    <h2>当前状态</h2>
+    <div id="current-status" class="status-box not-found">
+      等待检测...
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>控制</h2>
+    <button onclick="startMonitoring()">开始监控（持续 10 秒）</button>
+    <button onclick="checkNow()">立即检查</button>
+    <button onclick="clearLogs()">清除日志</button>
+  </div>
+
+  <div class="section">
+    <h2>检测日志</h2>
+    <div id="log-container"></div>
+  </div>
+
+  <div class="section">
+    <h2>调试信息</h2>
+    <div id="debug-info"></div>
+  </div>
+
+  <script>
+    let logContainer = document.getElementById('log-container');
+    let statusDiv = document.getElementById('current-status');
+
+    function addLog(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const timestamp = new Date().toLocaleTimeString();
+      entry.textContent = `[${timestamp}] ${message}`;
+      logContainer.insertBefore(entry, logContainer.firstChild);
+    }
+
+    function checkNow() {
+      addLog('检查 window.ethereum...', 'info');
+
+      const result = {
+        'typeof window.ethereum': typeof window.ethereum,
+        'typeof window.ethereum': typeof window.ethereum,
+        'window.ethereum': window.ethereum,
+      };
+
+      let html = '<div style="margin-top: 10px;">';
+      for (const [key, value] of Object.entries(result)) {
+        const valueStr = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+        html += `<div style="padding: 5px; margin: 5px 0; background: #f8f9fa; border-radius: 4px;">
+          <strong>${key}:</strong> ${valueStr}
+        </div>`;
+      }
+      html += '</div>';
+
+      if (typeof window.ethereum !== 'undefined') {
+        addLog('✅ 找到 window.ethereum!', 'success');
+        statusDiv.className = 'status-box found';
+        statusDiv.innerHTML = '✅ MetaMask 已注入！<br><br>' + html;
+      } else {
+        addLog('❌ window.ethereum 未定义', 'error');
+        statusDiv.className = 'status-box not-found';
+        statusDiv.innerHTML = '❌ MetaMask 未注入<br><br>' + html;
+      }
+    }
+
+    async function startMonitoring() {
+      addLog('开始监控（10 秒）...', 'info');
+      clearLogs();
+
+      for (let i = 1; i <= 20; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const found = typeof window.ethereum !== 'undefined';
+        addLog(`检查 ${i}/20: ${found ? '✅ 找到' : '❌ 未找到'}`, found ? 'success' : 'info');
+
+        if (found) {
+          addLog('MetaMask 已注入！停止监控。', 'success');
+          checkNow();
+          return;
+        }
+      }
+
+      addLog('监控结束：未检测到 MetaMask', 'error');
+    }
+
+    function clearLogs() {
+      logContainer.innerHTML = '';
+    }
+
+    // 页面加载时立即检查
+    window.addEventListener('load', () => {
+      addLog('页面加载完成', 'info');
+      checkNow();
+
+      // 持续监控
+      setTimeout(() => {
+        startMonitoring();
+      }, 1000);
+
+      // 显示调试信息
+      showDebugInfo();
+    });
+
+    function showDebugInfo() {
+      const debugInfo = {
+        '页面 URL': window.location.href,
+        'User Agent': navigator.userAgent,
+        '文档就绪状态': document.readyState,
+        '时间戳': new Date().toISOString(),
+      };
+
+      let html = '<div style="margin-top: 10px;">';
+      for (const [key, value] of Object.entries(debugInfo)) {
+        html += `<div style="padding: 5px; margin: 5px 0; background: #f8f9fa; border-radius: 4px;">
+          <strong>${key}:</strong> ${value}
+        </div>`;
+      }
+      html += '</div>';
+
+      document.getElementById('debug-info').innerHTML = html;
+    }
+
+    // 监听 DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', () => {
+      addLog('DOMContentLoaded 事件触发', 'info');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MetaMask 调试工具</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+    h2 {
+      color: #666;
+      border-bottom: 2px solid #f6851b;
+      padding-bottom: 10px;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    button {
+      background: #f6851b;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      margin: 5px;
+    }
+    button:hover {
+      background: #e6760f;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .code {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .property {
+      margin: 5px 0;
+      padding: 8px;
+      background: #f8f9fa;
+      border-left: 3px solid #f6851b;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .label {
+      font-weight: bold;
+      color: #666;
+      display: inline-block;
+      min-width: 150px;
+    }
+    .value {
+      color: #333;
+    }
+    .value-undefined {
+      color: #dc3545;
+    }
+    .value-defined {
+      color: #28a745;
+    }
+    #auto-check-results {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 MetaMask 调试工具</h1>
+
+  <div class="section">
+    <h2>1. 自动检测</h2>
+    <p>页面加载时自动检测 MetaMask 状态</p>
+    <div id="auto-check-results"></div>
+  </div>
+
+  <div class="section">
+    <h2>2. 手动检测</h2>
+    <button onclick="checkMetaMask()">🔍 检测 MetaMask</button>
+    <button onclick="checkAllProviders()">🔍 检测所有以太坊提供者</button>
+    <button onclick="checkWindowProperties()">🔍 检查 window 属性</button>
+    <button onclick="connectWallet()">🔗 连接钱包</button>
+    <button onclick="refreshPage()">🔄 刷新页面</button>
+    <div id="manual-check-results"></div>
+  </div>
+
+  <div class="section">
+    <h2>3. window.ethereum 对象详情</h2>
+    <button onclick="showEthereumObject()">📋 显示 ethereum 对象</button>
+    <div id="ethereum-details"></div>
+  </div>
+
+  <div class="section">
+    <h2>4. 测试请求</h2>
+    <button onclick="testEthChainId()">🔗 测试 eth_chainId</button>
+    <button onclick="testEthAccounts()">🔗 测试 eth_accounts</button>
+    <button onclick="testEthRequestAccounts()">🔗 测试 eth_requestAccounts</button>
+    <div id="test-results"></div>
+  </div>
+
+  <div class="section">
+    <h2>5. 调试信息</h2>
+    <div id="debug-info"></div>
+  </div>
+
+  <script>
+    // ============================================
+    // 工具函数
+    // ============================================
+
+    function showStatus(elementId, message, type = 'info') {
+      const element = document.getElementById(elementId);
+      const statusDiv = document.createElement('div');
+      statusDiv.className = `status ${type}`;
+      statusDiv.innerHTML = message;
+      element.insertBefore(statusDiv, element.firstChild);
+    }
+
+    function clearResults(elementId) {
+      document.getElementById(elementId).innerHTML = '';
+    }
+
+    function formatObject(obj, indent = 0) {
+      if (obj === null) return 'null';
+      if (obj === undefined) return 'undefined';
+      if (typeof obj !== 'object') return JSON.stringify(obj);
+
+      const spaces = '  '.repeat(indent);
+      let result = '{\n';
+      for (const [key, value] of Object.entries(obj)) {
+        const formattedValue = typeof value === 'object' ? formatObject(value, indent + 1) : JSON.stringify(value);
+        result += `${spaces}  ${key}: ${formattedValue},\n`;
+      }
+      result += `${spaces}}`;
+      return result;
+    }
+
+    // ============================================
+    // 检测函数
+    // ============================================
+
+    function checkMetaMask() {
+      clearResults('manual-check-results');
+      showStatus('manual-check-results', '开始检测 MetaMask...', 'info');
+
+      setTimeout(() => {
+        const checks = [];
+
+        // 检查 1: window.ethereum 是否存在
+        checks.push({
+          label: 'typeof window.ethereum',
+          value: typeof window.ethereum,
+          status: typeof window.ethereum !== 'undefined' ? 'defined' : 'undefined'
+        });
+
+        // 检查 2: isMetaMask
+        if (window.ethereum) {
+          checks.push({
+            label: 'window.ethereum.isMetaMask',
+            value: window.ethereum.isMetaMask,
+            status: window.ethereum.isMetaMask ? 'defined' : 'undefined'
+          });
+
+          // 检查 3: isSelected
+          checks.push({
+            label: 'window.ethereum.isSelected (已选择)',
+            value: window.ethereum.isSelected?.() || 'N/A',
+            status: 'info'
+          });
+
+          // 检查 4: isUnlocked
+          checks.push({
+            label: 'window.ethereum.isUnlocked (已解锁)',
+            value: window.ethereum.isUnlocked?.() || 'N/A',
+            status: 'info'
+          });
+
+          // 检查 5: selectedAddress
+          checks.push({
+            label: 'window.ethereum.selectedAddress',
+            value: window.ethereum.selectedAddress || '未连接',
+            status: window.ethereum.selectedAddress ? 'defined' : 'undefined'
+          });
+
+          // 检查 6: chainId
+          checks.push({
+            label: 'window.ethereum.chainId',
+            value: window.ethereum.chainId || '未知',
+            status: window.ethereum.chainId ? 'defined' : 'undefined'
+          });
+
+          // 检查 7: networkVersion
+          checks.push({
+            label: 'window.ethereum.networkVersion',
+            value: window.ethereum.networkVersion || '未知',
+            status: 'info'
+          });
+        }
+
+        // 显示结果
+        let html = '<div style="margin-top: 10px;">';
+        checks.forEach(check => {
+          const valueClass = check.status === 'undefined' ? 'value-undefined' : 'value-defined';
+          html += `
+            <div class="property">
+              <span class="label">${check.label}:</span>
+              <span class="value ${valueClass}">${check.value}</span>
+            </div>
+          `;
+        });
+        html += '</div>';
+
+        if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
+          showStatus('manual-check-results', '✅ MetaMask 已安装并可用！' + html, 'success');
+        } else if (typeof window.ethereum !== 'undefined') {
+          showStatus('manual-check-results', '⚠️ 检测到以太坊提供者，但不是 MetaMask' + html, 'info');
+        } else {
+          showStatus('manual-check-results', '❌ 未检测到 MetaMask！<br><br>请确保：<br>1. 已安装 MetaMask 扩展<br>2. MetaMask 已解锁<br>3. 刷新此页面', 'error');
+        }
+      }, 100);
+    }
+
+    function checkAllProviders() {
+      clearResults('manual-check-results');
+      showStatus('manual-check-results', '检查所有以太坊提供者...', 'info');
+
+      setTimeout(() => {
+        const providers = {
+          'window.ethereum': window.ethereum,
+          'window.web3': window.web3,
+          'window.web3.currentProvider': window.web3?.currentProvider,
+        };
+
+        let html = '<div style="margin-top: 10px;">';
+        for (const [name, provider] of Object.entries(providers)) {
+          const status = provider ? 'defined' : 'undefined';
+          const statusClass = provider ? 'value-defined' : 'value-undefined';
+          const value = provider ? (provider.isMetaMask ? 'MetaMask' : typeof provider) : 'undefined';
+          html += `
+            <div class="property">
+              <span class="label">${name}:</span>
+              <span class="value ${statusClass}">${value}</span>
+            </div>
+          `;
+        }
+        html += '</div>';
+
+        showStatus('manual-check-results', '以太坊提供者检测结果：' + html, 'info');
+      }, 100);
+    }
+
+    function checkWindowProperties() {
+      clearResults('manual-check-results');
+      showStatus('manual-check-results', '检查 window 属性中包含 "eth" 的内容...', 'info');
+
+      const ethProps = Object.keys(window).filter(k =>
+        k.toLowerCase().includes('eth') ||
+        k.toLowerCase().includes('ethereum') ||
+        k.toLowerCase().includes('web3')
+      );
+
+      let html = '<div style="margin-top: 10px;">';
+      if (ethProps.length > 0) {
+        html += '<div class="property">找到以下相关属性：</div>';
+        ethProps.forEach(prop => {
+          html += `<div class="property">  - window.${prop}</div>`;
+        });
+      } else {
+        html += '<div class="property">❌ 未找到任何包含 "eth" 或 "web3" 的属性</div>';
+      }
+      html += '</div>';
+
+      showStatus('manual-check-results', html, ethProps.length > 0 ? 'success' : 'error');
+    }
+
+    function showEthereumObject() {
+      clearResults('ethereum-details');
+
+      if (!window.ethereum) {
+        showStatus('ethereum-details', '❌ window.ethereum 不存在', 'error');
+        return;
+      }
+
+      const properties = [
+        'isMetaMask',
+        'chainId',
+        'networkVersion',
+        'selectedAddress',
+        'isConnected',
+        'isUnlocked'
+      ];
+
+      let html = '<div style="margin-top: 10px;">';
+      properties.forEach(prop => {
+        const value = window.ethereum[prop];
+        const valueClass = value !== undefined && value !== null ? 'value-defined' : 'value-undefined';
+        const displayValue = value !== undefined && value !== null ? value : 'undefined';
+        html += `
+          <div class="property">
+            <span class="label">ethereum.${prop}:</span>
+            <span class="value ${valueClass}">${displayValue}</span>
+          </div>
+        `;
+      });
+
+      // 显示方法
+      const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(window.ethereum))
+        .filter(m => typeof window.ethereum[m] === 'function' && m !== 'constructor');
+
+      html += '<div class="property" style="margin-top: 15px;"><strong>可用的方法：</strong></div>';
+      methods.forEach(method => {
+        html += `<div class="property">  - ${method}()</div>`;
+      });
+
+      html += '</div>';
+      showStatus('ethereum-details', '✅ window.ethereum 对象详情：' + html, 'success');
+    }
+
+    // ============================================
+    // 测试函数
+    // ============================================
+
+    async function testEthChainId() {
+      clearResults('test-results');
+      showStatus('test-results', '调用 eth_chainId...', 'info');
+
+      try {
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        showStatus('test-results', `✅ Chain ID: ${chainId}`, 'success');
+      } catch (error) {
+        showStatus('test-results', `❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    async function testEthAccounts() {
+      clearResults('test-results');
+      showStatus('test-results', '调用 eth_accounts...', 'info');
+
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts && accounts.length > 0) {
+          showStatus('test-results', `✅ 已连接账户: ${accounts[0]}`, 'success');
+        } else {
+          showStatus('test-results', '⚠️ 当前没有连接的账户', 'info');
+        }
+      } catch (error) {
+        showStatus('test-results', `❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    async function testEthRequestAccounts() {
+      clearResults('test-results');
+      showStatus('test-results', '调用 eth_requestAccounts...', 'info');
+
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        showStatus('test-results', `✅ 已连接账户: ${accounts[0]}`, 'success');
+      } catch (error) {
+        showStatus('test-results', `❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    async function connectWallet() {
+      clearResults('manual-check-results');
+      showStatus('manual-check-results', '请求连接钱包...', 'info');
+
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        showStatus('manual-check-results', `✅ 成功连接到账户: ${accounts[0]}`, 'success');
+
+        // 重新检测
+        setTimeout(checkMetaMask, 500);
+      } catch (error) {
+        showStatus('manual-check-results', `❌ 连接失败: ${error.message}`, 'error');
+      }
+    }
+
+    function refreshPage() {
+      location.reload();
+    }
+
+    // ============================================
+    // 自动检测
+    // ============================================
+
+    window.addEventListener('load', () => {
+      console.log('[Debug] Page loaded');
+      console.log('[Debug] typeof window.ethereum:', typeof window.ethereum);
+
+      clearResults('auto-check-results');
+      showStatus('auto-check-results', '⏳ 等待 MetaMask 注入...', 'info');
+
+      // 延迟检测，给 MetaMask 时间注入
+      setTimeout(() => {
+        if (typeof window.ethereum !== 'undefined') {
+          showStatus('auto-check-results', '✅ 检测到 MetaMask！', 'success');
+
+          // 检查是否已连接
+          if (window.ethereum.selectedAddress) {
+            showStatus('auto-check-results', `✅ 已连接到: ${window.ethereum.selectedAddress}`, 'success');
+          }
+
+          // 显示更多信息
+          checkMetaMask();
+        } else {
+          showStatus('auto-check-results', '❌ 未检测到 MetaMask', 'error');
+          showStatus('auto-check-results', '请确保：<br>1. 已安装 MetaMask 扩展<br>2. MetaMask 已解锁<br>3. 尝试刷新此页面', 'error');
+        }
+      }, 1000);
+
+      // 监听 MetaMask 事件
+      if (window.ethereum) {
+        window.ethereum.on('accountsChanged', (accounts) => {
+          console.log('[Debug] Accounts changed:', accounts);
+          showStatus('auto-check-results', `账户已变化: ${accounts[0] || '未连接'}`, 'info');
+        });
+
+        window.ethereum.on('chainChanged', (chainId) => {
+          console.log('[Debug] Chain changed:', chainId);
+          showStatus('auto-check-results', `网络已变化: ${chainId}`, 'info');
+        });
+
+        window.ethereum.on('connect', () => {
+          console.log('[Debug] Connected');
+          showStatus('auto-check-results', '✅ 已连接到 MetaMask', 'success');
+        });
+
+        window.ethereum.on('disconnect', () => {
+          console.log('[Debug] Disconnected');
+          showStatus('auto-check-results', '❌ 与 MetaMask 断开连接', 'error');
+        });
+      }
+    });
+
+    // 页面信息
+    window.addEventListener('load', () => {
+      const debugInfo = {
+        '页面 URL': window.location.href,
+        'User Agent': navigator.userAgent,
+        '检测时间': new Date().toISOString(),
+      };
+
+      let html = '<div style="margin-top: 10px;">';
+      for (const [key, value] of Object.entries(debugInfo)) {
+        html += `
+          <div class="property">
+            <span class="label">${key}:</span>
+            <span class="value">${value}</span>
+          </div>
+        `;
+      }
+      html += '</div>';
+
+      document.getElementById('debug-info').innerHTML = html;
+    });
+  </script>
+</body>
+</html>

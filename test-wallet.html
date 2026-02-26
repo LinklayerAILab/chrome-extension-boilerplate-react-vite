@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Wallet Connection</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .test-section {
+      border: 1px solid #ccc;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    #result {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+  </style>
+</head>
+<body>
+  <h1>Web3 Wallet Connection Test</h1>
+
+  <div class="test-section">
+    <h2>Test 1: Check if MetaMask is installed</h2>
+    <button id="checkWallet">Check Wallet</button>
+    <div id="result1" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Connect Wallet</h2>
+    <button id="connectWallet">Connect Wallet</button>
+    <div id="result2" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: Get Chain ID</h2>
+    <button id="getChainId">Get Chain ID</button>
+    <div id="result3" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Debug Info</h2>
+    <div id="debug" class="result info"></div>
+  </div>
+
+  <script>
+    // 显示调试信息
+    function showDebugInfo() {
+      const debugInfo = {
+        'window.ethereum exists': typeof window.ethereum !== 'undefined',
+        'isMetaMask': window.ethereum?.isMetaMask || false,
+        'isConnected': window.ethereum?.isConnected() || false,
+        'selectedAddress': window.ethereum?.selectedAddress || 'None',
+        'chainId': window.ethereum?.chainId || 'None',
+      };
+      document.getElementById('debug').textContent = JSON.stringify(debugInfo, null, 2);
+    }
+
+    // 页面加载时显示调试信息
+    showDebugInfo();
+
+    // 监听账户变化
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts) => {
+        console.log('Accounts changed:', accounts);
+        showDebugInfo();
+      });
+
+      window.ethereum.on('chainChanged', (chainId) => {
+        console.log('Chain changed:', chainId);
+        showDebugInfo();
+      });
+    }
+
+    // 测试 1: 检查钱包
+    document.getElementById('checkWallet').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('result1');
+      resultDiv.className = 'result info';
+      resultDiv.textContent = 'Checking...';
+
+      try {
+        if (typeof window.ethereum === 'undefined') {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = '❌ MetaMask is not installed!';
+          return;
+        }
+
+        if (!window.ethereum.isMetaMask) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = '⚠️ Ethereum provider found, but it is not MetaMask';
+          return;
+        }
+
+        resultDiv.className = 'result success';
+        resultDiv.textContent = '✅ MetaMask is installed and ready!\n\nisMetaMask: ' + window.ethereum.isMetaMask;
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = '❌ Error: ' + error.message;
+      }
+
+      showDebugInfo();
+    });
+
+    // 测试 2: 连接钱包
+    document.getElementById('connectWallet').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('result2');
+      resultDiv.className = 'result info';
+      resultDiv.textContent = 'Connecting...';
+
+      try {
+        if (typeof window.ethereum === 'undefined') {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = '❌ MetaMask is not installed!';
+          return;
+        }
+
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+        if (accounts && accounts.length > 0) {
+          resultDiv.className = 'result success';
+          resultDiv.textContent = '✅ Connected successfully!\n\nAddress: ' + accounts[0];
+        } else {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = '❌ No accounts returned';
+        }
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = '❌ Error: ' + error.message;
+      }
+
+      showDebugInfo();
+    });
+
+    // 测试 3: 获取链 ID
+    document.getElementById('getChainId').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('result3');
+      resultDiv.className = 'result info';
+      resultDiv.textContent = 'Getting chain ID...';
+
+      try {
+        if (typeof window.ethereum === 'undefined') {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = '❌ MetaMask is not installed!';
+          return;
+        }
+
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+
+        const networks = {
+          '0x1': 'Ethereum Mainnet',
+          '0x89': 'Polygon',
+          '0xa4b1': 'Arbitrum',
+          '0xa': 'Optimism',
+          '0x2105': 'Base',
+        };
+
+        const networkName = networks[chainId] || 'Unknown';
+
+        resultDiv.className = 'result success';
+        resultDiv.textContent = '✅ Chain ID: ' + chainId + '\nNetwork: ' + networkName;
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = '❌ Error: ' + error.message;
+      }
+
+      showDebugInfo();
+    });
+
+    // 每 2 秒更新调试信息
+    setInterval(showDebugInfo, 2000);
+  </script>
+</body>
+</html>

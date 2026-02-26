@@ -3,6 +3,8 @@ import type { dynamicEnvValues } from './index.js';
 interface ICebEnv {
   readonly CEB_EXAMPLE: string;
   readonly CEB_DEV_LOCALE: string;
+  readonly CEB_AGENT_C_API_DEV: string;
+  readonly CEB_AGENT_C_API_PROD: string;
 }
 
 interface ICebCliEnv {
