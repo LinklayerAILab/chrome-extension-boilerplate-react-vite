@@ -56,9 +56,9 @@ export interface SelectOptionProps {
 }
 
 const sizeClasses = {
-  large: 'h-12 px-3 text-base',
-  middle: 'h-10 px-3 text-sm',
-  small: 'h-8 px-2 text-xs',
+  large: 'h-[48px] px-3 text-[16px]',
+  middle: 'h-[44px] px-3 text-[14px]',
+  small: 'h-[40px] px-2 text-[12px]',
 };
 
 const variantClasses = {
@@ -291,7 +291,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(
 
           <svg
             className={classNames(
-              'ml-2 h-4 w-4 text-gray-400 transition-transform duration-200',
+              'ml-2 h-[20px] w-[20px] text-gray-400 transition-transform duration-200',
               isOpen && 'rotate-180 transform',
             )}
             fill="none"

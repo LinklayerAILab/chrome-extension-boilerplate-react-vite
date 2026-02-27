@@ -194,7 +194,7 @@ export const AddApi = () => {
                   value={platform.name}
                   label={platform.name}
                   disabled={platform.disabled}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-[14px]">
                     <img
                       src={platform.imgA}
                       alt={platform.name}
@@ -282,7 +282,7 @@ export const AddApi = () => {
             {list.map((item, index) => (
               <div
                 key={index}
-                className="mt-[10px] flex h-[5.8vh] cursor-pointer items-center justify-between rounded-[8px] bg-[#F1F1F1] p-[10px]">
+                className="mt-[10px] flex h-[50px] cursor-pointer items-center justify-between rounded-[8px] bg-[#F1F1F1] p-[10px]">
                 <div className="flex items-center gap-3">
                   <img src={item.imgA} alt={item.name} className="h-[28px] w-[28px] object-contain" />
                   <div className="text-[11px] font-bold">

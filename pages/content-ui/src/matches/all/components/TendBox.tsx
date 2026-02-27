@@ -142,7 +142,7 @@ export const TendBox: React.FC<TendBoxProps> = ({ onAnalyze }) => {
         {childs.map((item: StrategyItem, idx) => (
           <div
             key={item.value}
-            className="child-item mb-[10px] mr-[4px] flex h-[56px] cursor-pointer items-center justify-between rounded-[4px] bg-[#F1F1F1] px-4 transition-colors hover:bg-gray-50"
+            className="child-item mb-[10px] mr-[4px] flex h-[50px] cursor-pointer items-center justify-between rounded-[4px] bg-[#F1F1F1] px-4 transition-colors hover:bg-gray-50"
             onClick={() => onAnalyze(item)}>
             <div className="flex items-center gap-2 text-[13px] font-bold">
               <img src={bookIcon} alt="book" className="h-[18px] w-[18px] flex-shrink-0" />

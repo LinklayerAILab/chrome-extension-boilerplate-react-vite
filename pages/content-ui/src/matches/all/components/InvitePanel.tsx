@@ -69,10 +69,10 @@ export const InvitePanel = () => {
         {t.invite?.shareDesc2 || 'Double the points: You earn, they earn.'}
       </div>
       <div className="flex justify-between gap-4">
-        <Button onClick={handleCopyLink} block style={{ background: '#cf0', fontWeight: 'bold' }}>
+        <Button onClick={handleCopyLink} size="small" block style={{ background: '#cf0', fontWeight: 'bold' }}>
           {t.invite?.copyLink || 'Copy Link'}
         </Button>
-        <Button onClick={handlePostOn} block style={{ background: '#cf0', fontWeight: 'bold' }}>
+        <Button onClick={handlePostOn} size="small" block style={{ background: '#cf0', fontWeight: 'bold' }}>
           {t.invite?.postOn || 'Post on'}
         </Button>
       </div>

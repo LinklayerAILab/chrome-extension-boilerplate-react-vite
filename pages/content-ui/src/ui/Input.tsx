@@ -21,9 +21,9 @@ export interface PasswordProps extends Omit<InputProps, 'type'> {
 }
 
 const sizeClasses = {
-  large: 'h-12 px-3 text-[14px]',
-  middle: 'h-10 px-3 text-[12px]',
-  small: 'h-8 px-2 text-[10px]',
+  large: 'h-[48px] px-3 text-[14px]',
+  middle: 'h-[44px] px-3 text-[12px]',
+  small: 'h-[40px] px-2 text-[10px]',
 };
 const fontSizeClasses = {
   large: 'text-[14px]',
@@ -129,7 +129,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             className="ml-2 mr-1 flex items-center text-gray-500 hover:text-gray-700"
             onClick={handleSearch}
             disabled={disabled}>
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-[20px] w-[20px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="8" strokeWidth="2" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35" />
             </svg>
@@ -218,10 +218,10 @@ export const InputPassword = forwardRef<HTMLInputElement, PasswordProps>(
     const suffix = visibilityToggle ? (
       <button
         type="button"
-        className="flex items-center pr-2 text-gray-500 transition-colors hover:text-gray-700"
+        className="flex items-center text-gray-500 transition-colors hover:text-gray-700"
         onClick={toggleVisibility}>
         {visible ? (
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-[20px] w-[20px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path
               strokeLinecap="round"
@@ -231,7 +231,7 @@ export const InputPassword = forwardRef<HTMLInputElement, PasswordProps>(
             />
           </svg>
         ) : (
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-[20px] w-[20px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

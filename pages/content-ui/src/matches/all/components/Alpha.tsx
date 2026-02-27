@@ -250,6 +250,7 @@ export const Alpha = () => {
             priceLoading={priceLoading}
             depthLoading={liquidityLoading}
             data={item}
+            isLogin={isLogin}
           />
         ))
       )}

@@ -221,9 +221,9 @@ export const Login = ({ onLoginSuccess, onConnect, isConnecting = false, connect
                 key={wallet.id}
                 onClick={() => handleWalletClick(wallet)}
                 disabled={Boolean(isConnecting && wallet.installed)}
-                className="mb-[10px] flex h-[50px] w-full items-center justify-between rounded-lg bg-[#F2F2F2] px-[14px] text-sm font-semibold text-gray-700 transition-all hover:bg-[#E3E3E3] active:bg-[#D0D0D0] disabled:cursor-not-allowed disabled:opacity-60">
+                className="mb-[10px] flex h-[50px] w-full items-center justify-between rounded-lg bg-[#F2F2F2] px-[14px] text-[13px] font-semibold text-gray-700 transition-all hover:bg-[#E3E3E3] active:bg-[#D0D0D0] disabled:cursor-not-allowed disabled:opacity-60">
                 <span className="flex items-center gap-[10px]">
-                  <img src={wallet.icon} alt={wallet.name} className="h-[32px] w-[32px] rounded-[6px]" />
+                  <img src={wallet.icon} alt={wallet.name} className="h-[24px] w-[24px] rounded-[6px]" />
                   <span>{wallet.name}</span>
                 </span>
                 <span className="flex items-center gap-[10px]">

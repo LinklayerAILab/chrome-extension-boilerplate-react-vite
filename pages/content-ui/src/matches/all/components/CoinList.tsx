@@ -43,13 +43,13 @@ const CoinImage = ({ src, symbol }: { src: string; symbol: string }) => {
 
   if (failed) {
     return (
-      <div className="flex h-[20px] w-[20px] items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-xs font-bold">
+      <div className="flex h-[24px] w-[24px] items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-xs font-bold">
         {symbol.slice(0, 1).toUpperCase()}
       </div>
     );
   }
 
-  return <img src={src} alt={symbol} className="h-[20px] w-[20px] rounded-full" onError={() => setFailed(true)} />;
+  return <img src={src} alt={symbol} className="h-[24px] w-[24px] rounded-full" onError={() => setFailed(true)} />;
 };
 
 const StarButton = ({
@@ -71,11 +71,11 @@ const StarButton = ({
       {loading ? (
         <span className="h-[14px] w-[14px] animate-spin rounded-full border-2 border-orange-300 border-t-transparent" />
       ) : collected ? (
-        <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] fill-current">
+        <svg viewBox="0 0 24 24" className="h-[20px] w-[20px] fill-current">
           <path d="M12 2l2.9 6.1 6.7.6-5 4.5 1.5 6.6L12 16.9 5.9 19.8l1.5-6.6-5-4.5 6.7-.6L12 2z" />
         </svg>
       ) : (
-        <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] fill-none stroke-current stroke-[1.6]">
+        <svg viewBox="0 0 24 24" className="h-[20px] w-[20px] fill-none stroke-current stroke-[1.6]">
           <path d="M12 2l2.9 6.1 6.7.6-5 4.5 1.5 6.6L12 16.9 5.9 19.8l1.5-6.6-5-4.5 6.7-.6L12 2z" />
         </svg>
       )}

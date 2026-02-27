@@ -1,7 +1,7 @@
 import { memo, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import type { AppDispatch, RootState } from '@src/store';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@src/store';
 import { useI18n } from '@src/lib/i18n';
 import { message } from '@src/ui';
 import {
@@ -25,13 +25,13 @@ interface StreamingModalProps {
   query: string;
   coinSymbol?: string;
   title?: ReactNode; // 新增：自定义标题
+  isLogin: boolean; // 新增：从 props 传递，避免内部订阅 Redux
 }
 
-const StreamingModal = memo(({ isOpen, onClose, type, query, coinSymbol, title }: StreamingModalProps) => {
+const StreamingModal = memo(({ isOpen, onClose, type, query, coinSymbol, title, isLogin }: StreamingModalProps) => {
   const { t } = useI18n();
   const bot = chrome.runtime.getURL('content-ui/agent/banner.png');
   const tAny = t as unknown as Record<string, any>;
-  const isLogin = useSelector((state: RootState) => state.user?.isLogin ?? false);
 
   // 获取 layout-box 元素
   const [layoutBox, setLayoutBox] = useState<HTMLElement | null>(null);

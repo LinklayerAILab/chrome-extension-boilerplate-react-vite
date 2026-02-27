@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, ReactNode, memo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@src/store';
 import { useI18n } from '@src/lib/i18n';
@@ -9,7 +9,6 @@ import CoinList from './CoinList';
 import { setPageInfo } from '@src/store/slices/pageInfoSlice';
 import type { AppDispatch } from '@src/store';
 import { useDispatch } from 'react-redux';
-import { syncPoints } from '@src/store/slices/userSlice';
 import { usePageInfoUpdate } from '@src/lib/hooks/usePageInfoUpdate';
 import { CoinHeader } from './CoinHeader';
 import { StrategyHeader } from './StrategyHeader';
@@ -29,13 +28,12 @@ interface TendBoxStrategyItem {
 
 type StreamingType = 'analyse' | 'recommend' | null;
 
-export const Politer = () => {
+export const Politer = memo(() => {
   const { t, locale } = useI18n();
   usePageInfoUpdate('poliet', locale);
   const tAny = t as unknown as Record<string, any>;
   const dispatch = useDispatch<AppDispatch>();
   const isLogin = useSelector((state: RootState) => state.user?.isLogin ?? false);
-  const points = useSelector((state: RootState) => state.user.points);
   const isOpen = useSelector((state: RootState) => state.ui.isSidePanelOpen);
 
   const [btns, setBtns] = useState<TabItem[]>([
@@ -221,8 +219,11 @@ export const Politer = () => {
           query={streamingModal.query}
           coinSymbol={streamingModal.coinSymbol}
           title={streamingModal.title}
+          isLogin={isLogin}
         />
       )}
     </div>
   );
-};
+});
+
+Politer.displayName = 'Politer';

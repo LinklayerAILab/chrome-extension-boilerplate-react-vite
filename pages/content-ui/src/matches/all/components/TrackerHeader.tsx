@@ -11,7 +11,7 @@ interface TrackerHeaderProps {
 export const TrackerHeader = (props: TrackerHeaderProps) => {
   return (
     <div className="m-4 flex h-[135px] gap-4 rounded-[8px] border-[2px] border-solid border-black bg-[#F9FFE2] p-6">
-      <div>
+      <div className="flex items-center justify-center">
         <img src={bot} className="w-[74px]"></img>
       </div>
       <div className="flex w-full items-center text-[12px]">

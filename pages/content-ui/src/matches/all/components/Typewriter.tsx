@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState, memo } from 'react';
 import html2canvas from 'html2canvas';
 import * as htmlToImage from 'html-to-image';
 import ReactMarkdown from 'react-markdown';
@@ -825,4 +825,6 @@ const Typewriter = ({
   );
 };
 
-export default Typewriter;
+export default memo(Typewriter);
+
+Typewriter.displayName = 'Typewriter';

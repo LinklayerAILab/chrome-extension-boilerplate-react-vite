@@ -15,6 +15,7 @@ interface AlphaCardProps {
   priceLoading?: boolean;
   depthLoading?: boolean;
   data?: unknown;
+  isLogin: boolean; // 新增：isLogin prop
 }
 
 export const AlphaCard = ({
@@ -27,6 +28,7 @@ export const AlphaCard = ({
   priceLoading = false,
   depthLoading = false,
   data,
+  isLogin,
 }: AlphaCardProps) => {
   const { t } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,17 +88,17 @@ export const AlphaCard = ({
     <div className="alpha-card flex gap-3 px-[14px] py-[14px] text-[12px] text-black">
       <div className="flex w-[110px] flex-col items-center justify-center gap-2 rounded-[8px] border-[2px] border-solid border-black p-[10px]">
         {statusLoading ? (
-          <Skeleton.Circle className="h-[4.3vh] w-[4.3vh] border-[2px] border-solid border-black" />
+          <Skeleton.Circle className="h-[60px] w-[60px] border-[2px] border-solid border-black" />
         ) : (
-          <div className="h-[4.3vh] w-[4.3vh] rounded-full border-[2px] border-solid border-black">
+          <div className="h-[56px] w-[56px] rounded-full border-[2px] border-solid border-black">
             <img src={icon} alt="" className="h-full w-full rounded-full"></img>
           </div>
         )}
         {statusLoading ? (
-          <Skeleton.Circle className="h-[4.3vh] w-[4.3vh] border-[2px] border-solid border-black" />
+          <Skeleton.Circle className="h-[60px] w-[60px] border-[2px] border-solid border-black" />
         ) : statusColor ? (
           <div
-            className="alpha-status h-[4.3vh] w-[4.3vh] rounded-full border-[2px] border-solid border-black"
+            className="alpha-status h-[56px] w-[56px] rounded-full border-[2px] border-solid border-black"
             style={{
               animation: `${renderClass(statusColor)} 4s ease-in-out ${randomDelay}s infinite`,
             }}></div>
@@ -131,10 +133,15 @@ export const AlphaCard = ({
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <Button block style={{ fontSize: '12px', padding: '0px 5px' }} onClick={handleExplorer}>
+          <Button block size="small" style={{ fontSize: '14px', padding: '0px 5px' }} onClick={handleExplorer}>
             {t.common?.explorer || 'Explorer'}
           </Button>
-          <Button id="agent-btn" block style={{ fontSize: '12px', padding: '0px 5px' }} onClick={handleAgentClick}>
+          <Button
+            id="agent-btn"
+            block
+            size="small"
+            style={{ fontSize: '14px', padding: '0px 5px' }}
+            onClick={handleAgentClick}>
             {t.common?.agent || 'Agent'}
           </Button>
         </div>
@@ -153,6 +160,7 @@ export const AlphaCard = ({
               tradingUrl={`https://www.binance.com/zh-CN/alpha/bsc/${data.token_address}`}></CoinHeader>
           }
           query={query}
+          isLogin={isLogin}
         />
       )}
     </div>

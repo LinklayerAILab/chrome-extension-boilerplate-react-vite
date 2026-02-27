@@ -324,6 +324,7 @@ export const PlatformList = ({
               tradingUrl={`https://www.binance.com/en/trade/${streamingModal.coinSymbol!.split('USDT')[0].toUpperCase()}_USDT?type=spot`}
               type="SPOT"></CoinHeader>
           }
+          isLogin={isLogin}
         />
       )}
     </div>

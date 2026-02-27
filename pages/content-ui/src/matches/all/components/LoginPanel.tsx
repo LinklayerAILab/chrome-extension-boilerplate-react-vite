@@ -54,7 +54,7 @@ export const LoginPanel = ({ onLogout }: { onLogout?: () => void }) => {
             <img src={iconRounded}></img>
           </div>
         </div>
-        <Button id="logout" className="bg-[#cf0]" style={{ background: '#cf0' }} onClick={onLogout}>
+        <Button id="logout" size="small" className="bg-[#cf0]" style={{ background: '#cf0' }} onClick={onLogout}>
           <span className="flex items-center gap-2 font-bold">{t.loginPanel?.logout || 'Log out'}</span>
         </Button>
       </div>

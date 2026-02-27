@@ -261,7 +261,7 @@ export const Points = () => {
 
           {/* 充值按钮 */}
           <div className="mt-[2vh] flex cursor-pointer select-none items-center justify-center rounded-[5px]">
-            <Button size="large" className="font-bold" style={{ background: '#cf0' }} block>
+            <Button size="small" className="font-bold" style={{ background: '#cf0' }} block>
               {t.myPoints?.recharge || 'Recharge'}
             </Button>
           </div>

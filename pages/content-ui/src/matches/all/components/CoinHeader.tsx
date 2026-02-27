@@ -19,20 +19,30 @@ export const CoinHeader = (props: CoinHeaderProps) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchPrice = async () => {
+    const fetchPrice = async (showLoading: boolean) => {
       try {
-        setLoading(true);
+        if (showLoading) {
+          setLoading(true);
+        }
         const response = await get_spot_price({ symbol: props.symbol.split('USDT')[0].toUpperCase() });
         setPrice(response.data.price);
       } catch (error) {
         console.error('Failed to fetch spot price:', error);
         setPrice(null);
       } finally {
-        setLoading(false);
+        if (showLoading) {
+          setLoading(false);
+        }
       }
     };
+
     if (props.priceLoop) {
-      fetchPrice();
+      // 立即调用一次，显示 loading
+      fetchPrice(true);
+      // 设置定时器，每8秒调用一次，不显示 loading
+      const intervalId = setInterval(() => fetchPrice(false), 8000);
+      // 清理函数：组件卸载或依赖变化时清除定时器
+      return () => clearInterval(intervalId);
     }
   }, [props.symbol, props.priceLoop]);
 
