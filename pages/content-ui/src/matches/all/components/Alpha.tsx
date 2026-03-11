@@ -31,10 +31,10 @@ export const Alpha = () => {
   const [liquidityLoading, setLiquidityLoading] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
   const [updateTime, setUpdateTime] = useState(0);
-  const [relativeTime, setRelativeTime] = useState('0m age');
+  const [relativeTime, setRelativeTime] = useState('0m ago');
   useEffect(() => {
     if (!updateTime) {
-      setRelativeTime('0m age');
+      setRelativeTime('0m ago');
       return;
     }
     const update = () => {
@@ -44,9 +44,9 @@ export const Alpha = () => {
       const minutes = totalMinutes % 1440;
 
       if (days > 0) {
-        setRelativeTime(`${days}d${minutes}m age`);
+        setRelativeTime(`${days}d${minutes}m ago`);
       } else {
-        setRelativeTime(`${totalMinutes}m age`);
+        setRelativeTime(`${totalMinutes}m ago`);
       }
     };
     update();
@@ -197,7 +197,7 @@ export const Alpha = () => {
             </div>
           </div>
           <div className="flex min-h-[100px] flex-col rounded-[8px] border-[2px] border-solid border-black">
-            <div className="mx-[1px] mt-[1px] flex h-[68px] items-center justify-center gap-2 rounded-[6px] bg-black text-[17px] font-bold text-[#cf0]">
+            <div className="mx-[1px] mt-[1px] flex h-[48px] items-center justify-center gap-2 rounded-[6px] bg-black text-[17px] font-bold text-[#cf0]">
               <img src={dunpai} alt="Dunpai Logo" className="h-[18px] w-[18px]" />
               {t.alpha?.worstToken || 'Worst Token'}
             </div>

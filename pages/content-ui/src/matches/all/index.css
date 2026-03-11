@@ -57,7 +57,25 @@
   pointer-events: none;
   z-index: 9998;
 }
+.open-button{
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 8.8px 2.347px;
+  transition: ease .3s all;
+  width: 58px;
+}
+.open-button .open-close-button{
+  display: none;
+}
+.open-button:hover{
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 12px 4px;
+  width: 70px;
+}
+.open-button:hover .open-close-button{
+  display: block;
+}
 
+/* .layout-box.page-token{
+  background-color: #F3F3F3;
+} */
 .perps-page .markdown-body {
   background-color: #f2f2f2;
 }

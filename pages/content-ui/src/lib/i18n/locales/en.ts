@@ -45,8 +45,9 @@ export const en: LocaleMessages = {
     api: 'API',
     earn: 'Earn',
     perps: 'Perps',
-    poliet: 'Poliet',
+    poliet: 'Piloter',
     points: 'Points',
+    token: 'BRC20',
   },
   strategy: {
     types: {
@@ -181,7 +182,10 @@ export const en: LocaleMessages = {
     time: 'Time',
     type: 'Type',
     points: 'Points',
-    lpDepth: 'LP depth',
+    lpDepth: 'LP Depth',
+    lpStability: 'LP Stability',
+    optimal: 'Optimal',
+    trade: 'Trade',
     time5m: '5m',
     closeDialog: 'Close dialog',
     close: 'Close',
@@ -212,6 +216,8 @@ export const en: LocaleMessages = {
     scanTip: 'Open LinkLayer AI to view the full report.',
     download: 'Download',
     trading: 'Trading',
+    token: 'BSC State-Scanner',
+    tokenDesc: 'Live on-chain filtering for the most liquid assets on BNB Chain',
   },
   home: {
     retroactiveBonus: 'Retroactive Bonus',
@@ -267,14 +273,14 @@ export const en: LocaleMessages = {
     },
     earn: {
       title: 'Earn LLAx',
-      description: 'Claim LLAx from past perps losses and monthly trading records.',
+      description: 'Claim LLAx from past perps losses and monthly trading records',
     },
     perps: {
       title: 'Perps Agent',
       description: 'Monitor and analyze your live perps exposure.',
     },
     poliet: {
-      title: 'Picker Agent',
+      title: 'CEX Agent',
       description: 'Analyze Binance spot and futures markets',
     },
     points: {

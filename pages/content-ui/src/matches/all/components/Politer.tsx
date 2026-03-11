@@ -99,14 +99,6 @@ export const Politer = memo(() => {
       message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
       return;
     }
-    // const p = await dispatch(syncPoints())
-    // console.warn('p',p)
-    // console.log('points',points)
-    // if (p.payload <= 0) {
-    //   message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
-    //   return;
-    // }
-
     const typeStr = coinType === 2 ? (tAny?.agent?.contract ?? 'contract') : '';
     const query = `${tAny?.agent?.analyze ?? 'Analyze'} ${symbol} ${typeStr}`.trim();
 
@@ -132,19 +124,6 @@ export const Politer = memo(() => {
       message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
       return;
     }
-
-    // let latestPoints = points;
-    // try {
-    //   latestPoints = await dispatch(syncPoints()).unwrap();
-    // } catch {
-    //   message.warning(tAny?.common?.syncPointsFailed ?? 'Failed to sync points');
-    //   return;
-    // }
-    // debugger
-    // if (latestPoints <= 0) {
-    //   message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
-    //   return;
-    // }
 
     // 将 ReactNode 转换为字符串
     const labelStr = typeof strategy.label === 'string' ? strategy.label : String(strategy.label);

@@ -244,7 +244,9 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(
                       color: option.disabled ? '#d1d5db' : '#374151',
                     }}
                     onClick={() => handleSelect(option.value, option)}>
-                    <div className="flex w-full items-center justify-between">{option.label}</div>
+                    <div className="flex w-full items-center justify-between whitespace-nowrap text-[14px]">
+                      {option.label}
+                    </div>
                   </div>
                 ))}
             {effectiveOptions.length === 0 && !hasOptionChildren && (

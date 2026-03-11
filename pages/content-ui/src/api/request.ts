@@ -1,6 +1,7 @@
 import { ACCESS_TOKEN_KEY, ADDRESS_KEY, WEB_APP_DATA_KEY } from '@src/lib/storageKeys';
 import { store } from '@src/store';
 import { setIsLogin } from '@src/store/slices/userSlice';
+import { setSidePanelOpen, setSelectedMenuId } from '@src/store/slices/uiSlice';
 
 export interface StreamingRequestOptions {
   delimiter?: string;
@@ -112,6 +113,8 @@ export async function* streamingRequest<TResponse = SSEMessageEvent>(
         }
         if (errorData?.code === 401 || proxyResponse?.status === 401) {
           store.dispatch(setIsLogin(false));
+          store.dispatch(setSidePanelOpen(false));
+          store.dispatch(setSelectedMenuId(1));
           window.dispatchEvent(new Event('unauthorized'));
           throw new Error(errorData?.message || 'Unauthorized');
         }
@@ -193,6 +196,8 @@ export async function* streamingRequest<TResponse = SSEMessageEvent>(
         }
         if (errorData?.code === 401 || response.status === 401) {
           store.dispatch(setIsLogin(false));
+          store.dispatch(setSidePanelOpen(false));
+          store.dispatch(setSelectedMenuId(1));
           window.dispatchEvent(new Event('unauthorized'));
           throw new Error(errorData?.message || 'Unauthorized');
         } else if (errorData?.code !== 0 && errorText) {

@@ -45,8 +45,9 @@ export const ru: LocaleMessages = {
     api: 'API',
     earn: 'Доход',
     perps: 'Перпсы',
-    poliet: 'Poliet',
+    poliet: 'Piloter',
     points: 'Баллы',
+    token: 'BRC20',
   },
   strategy: {
     types: {
@@ -182,6 +183,9 @@ export const ru: LocaleMessages = {
     type: 'Тип',
     points: 'Баллы',
     lpDepth: 'Глубина LP',
+    lpStability: 'Стабильность LP',
+    optimal: 'Оптимально',
+    trade: 'Торговать',
     time5m: '5м',
     closeDialog: 'Закрыть диалог',
     close: 'Закрыть',
@@ -212,6 +216,8 @@ export const ru: LocaleMessages = {
     scanTip: 'Откройте LinkLayer AI, чтобы просмотреть полный отчет.',
     download: 'Скачать',
     trading: 'Торговля',
+    token: 'BSC сканер состояния',
+    tokenDesc: 'Фильтрация ликвидных активов BNB Chain в реальном времени',
   },
   home: {
     retroactiveBonus: 'Ретробонус',
@@ -267,14 +273,14 @@ export const ru: LocaleMessages = {
     },
     earn: {
       title: 'Заработать LLAx',
-      description: 'Получите LLAx от прошлых убытков по фьючерсам и ежемесячных торговых записей.',
+      description: 'Получите LLAx от прошлых убытков по фьючерсам и ежемесячных торговых записей',
     },
     perps: {
       title: 'Агент фьючерсов',
-      description: 'Мониторинг и анализ ваших открытых позиций по фьючерсам.',
+      description: 'Мониторинг и анализ ваших открытых позиций по фьючерсам',
     },
     poliet: {
-      title: 'Агент выбора',
+      title: 'CEX агент',
       description: 'Анализ спотовых и фьючерсных рынков Binance',
     },
     points: {

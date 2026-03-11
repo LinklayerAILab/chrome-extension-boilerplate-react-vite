@@ -1,10 +1,11 @@
-import { AddApi } from './components/AddApi';
+﻿import { AddApi } from './components/AddApi';
 import { Alpha } from './components/Alpha';
 import { Login } from './components/Login';
 import { Minting } from './components/Minting';
 import { Perps } from './components/Perps';
 import { Politer } from './components/Politer';
 import { Points } from './components/Points';
+import { Token } from './components/Token';
 import * as WalletStorage from './lib/walletStorage';
 import { Menus } from './Menus';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import { SocialBtns } from './components/SocialBtns';
 import { PageLayout } from './components/PageLayout';
 import { AlphaBg } from './components/AlphaBg';
 import { I18nProvider } from '@src/lib/i18n';
+import { PlatformInjectionManager } from './components/SettingPanel';
 
 // 使用 chrome.runtime.getURL 获取扩展资源
 const getLogo = (path: string) => chrome.runtime.getURL(`content-ui/${path}`);
@@ -53,13 +55,14 @@ declare global {
 }
 window.__CONTENT_UI_WHITELIST_DOMAINS__ = CONTENT_UI_WHITELIST_DOMAINS;
 
-const pageKeyMap: Record<number, 'alpha' | 'api' | 'earn' | 'perps' | 'poliet' | 'points'> = {
+const pageKeyMap: Record<number, 'alpha' | 'api' | 'earn' | 'perps' | 'poliet' | 'points' | 'token'> = {
   1: 'alpha',
   2: 'api',
   3: 'earn',
   4: 'perps',
   5: 'poliet',
   6: 'points',
+  7: 'token',
 };
 
 /**
@@ -327,6 +330,15 @@ const SidePanelContentInner = () => {
   const [manuallyDisconnected, setManuallyDisconnected] = useState(false); // 记录用户是否主动退出
   const [metaMaskRestarted, setMetaMaskRestarted] = useState(false); // MetaMask 是否重启
   const isLoadingRef = useRef(false);
+  const [buttonTopPosition, setButtonTopPosition] = useState(0);
+  const [hasCustomPosition, setHasCustomPosition] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [didDrag, setDidDrag] = useState(false);
+  const [isFloatingButtonHovered, setIsFloatingButtonHovered] = useState(false);
+  const [showFloatingButton, setShowFloatingButton] = useState(true);
+  const dragStartOffset = useRef({ x: 0, y: 0 });
+  const dragStartPoint = useRef({ x: 0, y: 0 });
+  const dragButtonRef = useRef<HTMLDivElement>(null);
   const isLogin = useSelector((state: RootState) => state.user.isLogin);
   const selectedMenuId = useSelector((state: RootState) => state.ui.selectedMenuId);
   const isOpen = useSelector((state: RootState) => state.ui.isSidePanelOpen);
@@ -335,6 +347,88 @@ const SidePanelContentInner = () => {
 
   // 同步 pageInfo 翻译
   usePageInfoSync();
+
+  const clampButtonPosition = useCallback((top: number) => {
+    const rect = dragButtonRef.current?.getBoundingClientRect();
+    const buttonHeight = rect?.height ?? 32;
+    const maxTop = Math.max(0, window.innerHeight - buttonHeight);
+
+    return Math.min(Math.max(top, 0), maxTop);
+  }, []);
+
+  useEffect(() => {
+    const currentDomain = window.location.hostname;
+    const storageKey = `floatingButtonPosition_${currentDomain}`;
+
+    chrome.storage.local.get([storageKey], result => {
+      const storedPosition = result[storageKey];
+      if (!storedPosition) return;
+
+      if (typeof storedPosition.top === 'number') {
+        setButtonTopPosition(clampButtonPosition(storedPosition.top));
+        setHasCustomPosition(true);
+      }
+    });
+  }, [clampButtonPosition]);
+
+  useEffect(() => {
+    if (isDragging || !hasCustomPosition) return;
+    const currentDomain = window.location.hostname;
+    const storageKey = `floatingButtonPosition_${currentDomain}`;
+
+    chrome.storage.local.set({
+      [storageKey]: { top: buttonTopPosition },
+    });
+  }, [buttonTopPosition, isDragging, hasCustomPosition]);
+
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const rect = dragButtonRef.current?.getBoundingClientRect();
+      const buttonHeight = rect?.height ?? 32;
+      const maxTop = Math.max(0, window.innerHeight - buttonHeight);
+
+      // 只允许垂直拖动
+      const newTop = e.clientY - dragStartOffset.current.y;
+      setButtonTopPosition(Math.min(Math.max(newTop, 0), maxTop));
+
+      const movedY = Math.abs(e.clientY - dragStartPoint.current.y);
+      if (movedY > 2) {
+        setDidDrag(true);
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        document.body.style.cursor = '';
+      }
+    };
+
+    if (isDragging) {
+      document.body.style.cursor = '';
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+
+      return () => {
+        document.body.style.cursor = '';
+        document.removeEventListener('mousemove', handleGlobalMouseMove);
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    }
+  }, [isDragging]);
+
+  useEffect(() => {
+    if (!hasCustomPosition) return;
+
+    const handleResize = () => {
+      setButtonTopPosition(current => clampButtonPosition(current));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [clampButtonPosition, hasCustomPosition]);
   // 加载保存的钱包状态
   useEffect(() => {
     const loadWalletState = async () => {
@@ -780,7 +874,8 @@ const SidePanelContentInner = () => {
       3: getLogo('alpha/minting.svg'),
       4: getLogo('alpha/perps.svg'),
       5: getLogo('alpha/polit.svg'),
-      6: getLogo('alpha/points2.svg'),
+      6: getLogo('alpha/points.svg'),
+      7: getLogo('alpha/token.svg'),
     };
 
     const renderHeader = () => {
@@ -798,6 +893,7 @@ const SidePanelContentInner = () => {
         {selectedMenuId === 3 && <Minting />}
         {selectedMenuId === 4 && <Perps />}
         {selectedMenuId === 5 && <Politer />}
+        {selectedMenuId === 7 && <Token />}
         {selectedMenuId === 6 && <Points />}
       </PageLayout>
     );
@@ -805,13 +901,71 @@ const SidePanelContentInner = () => {
   const otherInfo = useSelector((state: RootState) => state.user.otherInfo);
   return (
     <div className="relative text-black">
+      {/* 平台注入管理器 - 页面加载时立即执行 */}
+      <PlatformInjectionManager />
+
       {/* 右下角浮动按钮 */}
-      {!isOpen && (
-        <button
-          onClick={() => store.dispatch(setSidePanelOpen(true))}
-          className={`pointer-events-auto fixed right-4 top-4 z-[11111] h-[50px] w-[50px] cursor-pointer font-sans text-sm text-white shadow-lg transition-all duration-200`}>
-          <img src={getLogo('rounded logo.svg')}></img>
-        </button>
+      {!isOpen && showFloatingButton && (
+        <div
+          ref={dragButtonRef}
+          className="open-button fixed z-[11111] flex cursor-pointer rounded-bl-full rounded-tl-full bg-white py-2 pl-3 hover:bg-[#cf0]"
+          style={{
+            right: '0px',
+            top: hasCustomPosition ? `${buttonTopPosition}px` : '20px',
+            // filter: 'drop-shadow(0 8px 6px rgb(0 0 0 / 0.2))',
+            transition: isDragging ? 'none' : 'width 200ms ease-in-out, filter 200ms ease-in-out',
+          }}
+          onClick={e => {
+            if (!didDrag) {
+              store.dispatch(setSidePanelOpen(true));
+            }
+          }}
+          // onMouseEnter={(e) => {
+          //   setIsFloatingButtonHovered(true);
+          //   if (!isDragging) {
+          //     e.currentTarget.style.filter = 'drop-shadow(0 20px 15px rgb(0 0 0 / 0.35))';
+          //   }
+          // }}
+          // onMouseLeave={(e) => {
+          //   setIsFloatingButtonHovered(false);
+          //   if (!isDragging) {
+          //     e.currentTarget.style.filter = 'drop-shadow(0 10px 8px rgb(0 0 0 / 0.1))';
+          //   }
+          // }}
+          onMouseDown={e => {
+            if (e.button !== 0) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            dragStartOffset.current = {
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            };
+            dragStartPoint.current = { x: e.clientX, y: e.clientY };
+            setDidDrag(false);
+
+            if (!hasCustomPosition) {
+              setButtonTopPosition(clampButtonPosition(rect.top));
+              setHasCustomPosition(true);
+            }
+
+            setIsDragging(true);
+            e.preventDefault();
+          }}>
+          <img
+            src={getLogo('close.svg')}
+            className="open-close-button absolute left-[-3px] top-[-3px] cursor-pointer"
+            alt="Close"
+            onClick={e => {
+              e.stopPropagation();
+              setShowFloatingButton(false);
+            }}></img>
+
+          <button className="pointer-events-none h-[30px] w-[30px] rounded-full font-sans text-sm text-white transition-all duration-200">
+            <img
+              src={getLogo(isFloatingButtonHovered ? 'botRounded-a.svg' : 'botRound.svg')}
+              className="h-full w-full rounded-full border-[1px] border-solid border-[#B5DF2E]"
+              alt="Bot"></img>
+          </button>
+        </div>
       )}
 
       {/* 侧边窗口 */}
@@ -820,7 +974,7 @@ const SidePanelContentInner = () => {
         className={`pointer-events-auto fixed top-0 z-[9998] flex h-screen w-[500px] bg-white font-sans shadow-2xl transition-all duration-300 ease-in-out ${
           isOpen ? 'right-0 opacity-100' : '-right-[500px] opacity-0'
         }`}>
-        <div className={'relative flex-1'} id="layout-box">
+        <div className={`layout-box relative flex-1 ${selectedMenuId === 7 && 'page-token'}`} id="layout-box">
           {!isLogin && (
             <div className="absolute right-4 top-4 z-[11111]">
               <button
@@ -895,173 +1049,6 @@ const SidePanelContentInner = () => {
 // 侧边面板组件 - IFRAME 方案不需要 Wagmi Provider
 const SidePanelContent = () => <SidePanelContentInner />;
 
-// X.com 侧边栏植入组件
-const XSidebarInjection = () => {
-  const injectedRef = useRef(false);
-  const currentPathRef = useRef(window.location.pathname);
-
-  useEffect(() => {
-    // 检查域名白名单
-    if (!isDomainWhitelisted()) {
-      return;
-    }
-
-    let observer: MutationObserver | null = null;
-    let routeCheckInterval: NodeJS.Timeout | null = null;
-
-    // 移除已植入的元素
-    const removeInjectedElement = () => {
-      const injectedElement = document.getElementById('agent-injection-element');
-      if (injectedElement) {
-        injectedElement.remove();
-      }
-      injectedRef.current = false;
-    };
-
-    // 查找 sidebarColumn 元素
-    const findAndInject = () => {
-      // 使用 ref 检查是否已注入，避免闭包陷阱
-      if (injectedRef.current) {
-        if (observer) {
-          observer.disconnect();
-        }
-        return;
-      }
-
-      const sidebarColumn = document.querySelector('[aria-label="Trending"]');
-      if (sidebarColumn) {
-        // 检查是否已经存在植入的元素
-        const existingElement = document.getElementById('agent-injection-element');
-        if (existingElement) {
-          injectedRef.current = true;
-          if (observer) {
-            observer.disconnect();
-          }
-          return;
-        }
-
-        // 创建植入元素
-        const injectionElement = document.createElement('div');
-        injectionElement.id = 'agent-injection-element';
-        injectionElement.className = 'agent-injection';
-        injectionElement.style.cssText = `
-          padding: 12px 16px;
-          margin: 0 0 14px;
-          background-color: rgb(255, 255, 255);
-          border-radius: 9999px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        `;
-
-        // 添加鼠标悬停效果
-        injectionElement.onmouseenter = () => {
-          injectionElement.style.backgroundColor = 'rgb(243, 244, 245)';
-        };
-        injectionElement.onmouseleave = () => {
-          injectionElement.style.backgroundColor = 'rgb(255, 255, 255)';
-        };
-
-        // 添加内容
-        injectionElement.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="width: 24px; height: 24px; background-color: #7A9900; border-radius: 50%;"></div>
-            <span style="font-size: 20px; font-weight: 700; color: rgb(15, 20, 25);">Test implant element
-
-/agent</span>
-          </div>
-        `;
-
-        // 植入到第一个子元素的第二个元素后面
-        const firstChild = sidebarColumn.children[0];
-        if (firstChild && firstChild.children[1]) {
-          firstChild.children[1].after(injectionElement);
-        } else {
-          // 如果结构不符合预期，则插入到最前面
-          sidebarColumn.prepend(injectionElement);
-        }
-        injectedRef.current = true;
-        console.log('[CEB] Agent element injected into X.com sidebar, path:', window.location.pathname);
-
-        // 注入后立即断开观察者
-        if (observer) {
-          observer.disconnect();
-        }
-      }
-    };
-
-    // 监听路由变化
-    const handleRouteChange = () => {
-      const newPath = window.location.pathname;
-      if (newPath !== currentPathRef.current) {
-        console.log('[CEB] Route changed from', currentPathRef.current, 'to', newPath);
-        currentPathRef.current = newPath;
-
-        // 移除旧的植入元素
-        removeInjectedElement();
-
-        // 重新植入
-        setTimeout(() => {
-          findAndInject();
-        }, 0); // 等待页面渲染完成
-      }
-    };
-
-    // 立即尝试植入
-    findAndInject();
-
-    // 监听 popstate 事件（浏览器前进/后退）
-    window.addEventListener('popstate', handleRouteChange);
-
-    // 监听 pushState 和 replaceState（SPA 路由）
-    const originalPushState = history.pushState;
-    const originalReplaceState = history.replaceState;
-
-    history.pushState = function (...args) {
-      originalPushState.apply(this, args);
-      handleRouteChange();
-    };
-
-    history.replaceState = function (...args) {
-      originalReplaceState.apply(this, args);
-      handleRouteChange();
-    };
-
-    // 定时检查路由变化（兜底方案）
-    routeCheckInterval = setInterval(() => {
-      handleRouteChange();
-    }, 1000);
-
-    // 如果元素不存在，使用 MutationObserver 等待
-    observer = new MutationObserver(() => {
-      findAndInject();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    return () => {
-      // 清理监听器
-      window.removeEventListener('popstate', handleRouteChange);
-      history.pushState = originalPushState;
-      history.replaceState = originalReplaceState;
-
-      if (observer) {
-        observer.disconnect();
-      }
-      if (routeCheckInterval) {
-        clearInterval(routeCheckInterval);
-      }
-
-      // 清理植入的元素
-      removeInjectedElement();
-    };
-  }, []);
-
-  return null;
-};
-
 // 主组件
 const App = () => {
   useEffect(() => {
@@ -1124,7 +1111,7 @@ const App = () => {
     return null;
   }
 
-  return <XSidebarInjection />;
+  // return <XSidebarInjection />;
 };
 
 export default App;

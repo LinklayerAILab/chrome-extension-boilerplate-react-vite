@@ -44,6 +44,7 @@ export interface LocaleMessages {
     perps: string;
     poliet: string;
     points: string;
+    token: string;
   };
   strategy: {
     types: {

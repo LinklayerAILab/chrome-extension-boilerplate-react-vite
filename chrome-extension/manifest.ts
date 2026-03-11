@@ -21,7 +21,7 @@ const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
 const manifest = {
   manifest_version: 3,
   default_locale: 'en',
-  name: 'LLA Agent',
+  name: 'LinkLayerAI',
   browser_specific_settings: {
     gecko: {
       id: 'example@example.com',
@@ -39,20 +39,20 @@ const manifest = {
   },
   action: {
     default_icon: {
-      '16': 'icon-16.png',
-      '32': 'icon-32.png',
-      '48': 'icon-48.png',
       '128': 'icon-128.png',
+      '48': 'icon-48.png',
+      '64': 'icon-64.png',
+      '1500': 'icon-1500.png',
     },
   },
-  chrome_url_overrides: {
-    newtab: 'new-tab/index.html',
-  },
+  // chrome_url_overrides: {
+  //   newtab: 'new-tab/index.html',
+  // },
   icons: {
-    '16': 'icon-16.png',
-    '32': 'icon-32.png',
-    '48': 'icon-48.png',
     '128': 'icon-128.png',
+    '48': 'icon-48.png',
+    '64': 'icon-64.png',
+    '1500': 'icon-1500.png',
   },
   content_scripts: [
     {

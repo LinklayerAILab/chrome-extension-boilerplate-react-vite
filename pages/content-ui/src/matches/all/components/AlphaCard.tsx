@@ -3,6 +3,7 @@ import { Button, Skeleton } from '@src/ui';
 import { useI18n } from '@src/lib/i18n';
 import StreamingModal from './StreamingModal';
 import { CoinHeader } from './CoinHeader';
+import { StatusIndicator } from './StatusIndicator';
 
 interface AlphaCardProps {
   title: string;
@@ -10,7 +11,7 @@ interface AlphaCardProps {
   depth?: string;
   type: number;
   icon: string;
-  statusColor?: string;
+  statusColor?: 'GREEN' | 'RED' | 'YELLOW';
   statusLoading?: boolean;
   priceLoading?: boolean;
   depthLoading?: boolean;
@@ -64,14 +65,6 @@ export const AlphaCard = ({
     return undefined;
   };
 
-  const randomDelay = useMemo(() => (Math.random() * 1 + 0.5).toFixed(2), []);
-  const renderClass = (str?: string) => {
-    if (str === 'GREEN') return 'gradientFade1';
-    if (str === 'RED') return 'gradientFade2';
-    if (str === 'YELLOW') return 'gradientFade3';
-    return '';
-  };
-
   const handleAgentClick = () => {
     setIsModalOpen(true);
   };
@@ -88,20 +81,16 @@ export const AlphaCard = ({
     <div className="alpha-card flex gap-3 px-[14px] py-[14px] text-[12px] text-black">
       <div className="flex w-[110px] flex-col items-center justify-center gap-2 rounded-[8px] border-[2px] border-solid border-black p-[10px]">
         {statusLoading ? (
-          <Skeleton.Circle className="h-[60px] w-[60px] border-[2px] border-solid border-black" />
+          <Skeleton.Circle className="h-[50px] w-[50px] border-[2px] border-solid border-black" />
         ) : (
-          <div className="h-[56px] w-[56px] rounded-full border-[2px] border-solid border-black">
+          <div className="h-[48px] w-[48px] rounded-full border-[2px] border-solid border-black">
             <img src={icon} alt="" className="h-full w-full rounded-full"></img>
           </div>
         )}
         {statusLoading ? (
-          <Skeleton.Circle className="h-[60px] w-[60px] border-[2px] border-solid border-black" />
+          <Skeleton.Circle className="h-[48px] w-[48px] border-[2px] border-solid border-black" />
         ) : statusColor ? (
-          <div
-            className="alpha-status h-[56px] w-[56px] rounded-full border-[2px] border-solid border-black"
-            style={{
-              animation: `${renderClass(statusColor)} 4s ease-in-out ${randomDelay}s infinite`,
-            }}></div>
+          <StatusIndicator statusColor={statusColor} size={48} />
         ) : null}
       </div>
       <div className="alpha-card-content flex flex-1 flex-col gap-2">

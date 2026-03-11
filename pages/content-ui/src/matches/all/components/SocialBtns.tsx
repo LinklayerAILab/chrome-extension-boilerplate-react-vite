@@ -12,10 +12,10 @@ export const SocialBtns = ({ onMenuSelect }: SocialBtnsProps) => {
       icon: 'money.svg',
       value: 1,
     },
-    {
-      icon: 'invite.svg',
-      value: 2,
-    },
+    // {
+    //   icon: 'invite.svg',
+    //   value: 2,
+    // },
     {
       icon: 'x.svg',
       link: 'https://x.com/LinkLayerAI',
@@ -43,10 +43,6 @@ export const SocialBtns = ({ onMenuSelect }: SocialBtnsProps) => {
               </a>
             ) : btn.value === 5 ? (
               <Popover content={<SettingPanel />} placement="topLeft" trigger="click">
-                <img src={iconUrl} alt={btn.icon} className="h-[3.5vh] w-[3.5vh]" />
-              </Popover>
-            ) : btn.value === 2 ? (
-              <Popover content={<InvitePanel />} placement="topLeft" trigger="click">
                 <img src={iconUrl} alt={btn.icon} className="h-[3.5vh] w-[3.5vh]" />
               </Popover>
             ) : btn.value === 1 ? (

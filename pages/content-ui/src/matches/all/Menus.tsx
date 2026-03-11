@@ -16,11 +16,18 @@ export const Menus = ({ store }: MenusProps) => {
 
   const menus = [
     {
+      id: 7,
+      title: t.menus?.token || 'Token',
+      icon: ICONS.TOKEN,
+      selectIcon: ICONS.TOKEN_SELECT,
+    },
+    {
       id: 1,
       title: t.menus?.alpha || 'Alpha',
       icon: ICONS.ALPHA,
       selectIcon: ICONS.ALPHA_SELECT,
     },
+
     {
       id: 2,
       title: t.menus?.api || 'Add API',

@@ -23,4 +23,6 @@ export const ICONS = {
   X_ICON: 'x.svg',
   TELEGRAM_ICON: 'telegram.svg',
   SETTING_ICON: 'setting.svg',
+  TOKEN: 'token.svg',
+  TOKEN_SELECT: 'token-select.svg',
 } as const;

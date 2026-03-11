@@ -47,6 +47,7 @@ export const ja: LocaleMessages = {
     perps: '無期限',
     poliet: 'ポリエ',
     points: 'ポイント',
+    token: 'BRC20',
   },
   strategy: {
     types: {
@@ -182,6 +183,9 @@ export const ja: LocaleMessages = {
     type: 'タイプ',
     points: 'ポイント',
     lpDepth: 'LP深度',
+    lpStability: 'LP安定性',
+    optimal: '最適',
+    trade: '取引',
     time5m: '5分',
     closeDialog: 'ダイアログを閉じる',
     close: '閉じる',
@@ -212,6 +216,8 @@ export const ja: LocaleMessages = {
     scanTip: 'LinkLayer AI で完全なレポートをご確認ください。',
     download: 'ダウンロード',
     trading: '取引',
+    token: 'BSC状態スキャナー',
+    tokenDesc: 'BNBチェーンで最も流動性の高い資産のリアルタイムオンチェーンフィルタリング',
   },
   home: {
     retroactiveBonus: 'レトロボーナス',
@@ -267,14 +273,14 @@ export const ja: LocaleMessages = {
     },
     earn: {
       title: 'LLAx獲得',
-      description: '過去の先物損失と月次取引記録からLLAxを請求してください。',
+      description: '過去の先物損失と月次取引記録からLLAxを請求してください',
     },
     perps: {
       title: '先物エージェント',
       description: 'リアルタイム先物ポジションをモニタリング・分析',
     },
     poliet: {
-      title: 'ピッカーエージェント',
+      title: 'CEX エージェント',
       description: 'Binanceの現物・先物市場を分析',
     },
     points: {

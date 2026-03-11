@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { ACCESS_TOKEN_KEY, ADDRESS_KEY } from '@src/lib/storageKeys';
 import { store } from '@src/store';
 import { setIsLogin } from '@src/store/slices/userSlice';
+import { setSidePanelOpen, setSelectedMenuId } from '@src/store/slices/uiSlice';
 import { API_BASE_URL } from './config';
 
 export const service = axios.create({
@@ -62,6 +63,8 @@ service.interceptors.response.use(
     // 只处理 401 错误，其他错误不显示 Message
     if (data?.code === 401 || error.response?.status === 401) {
       store.dispatch(setIsLogin(false));
+      store.dispatch(setSidePanelOpen(false));
+      store.dispatch(setSelectedMenuId(1));
       window.dispatchEvent(new Event('unauthorized'));
       window.localStorage.removeItem(ACCESS_TOKEN_KEY);
     }

@@ -14,6 +14,7 @@ type PageInfoState = {
   perps: PageInfo;
   poliet: PageInfo;
   points: PageInfo;
+  token: PageInfo;
 };
 
 // 默认英文初始状态（用于 Redux store 初始化）
@@ -28,11 +29,11 @@ const defaultInitialState: PageInfoState = {
   },
   earn: {
     title: 'Earn LLAx',
-    description: 'Claim LLAx from past perps losses and monthly trading records.',
+    description: 'Claim LLAx from past perps losses and monthly trading records',
   },
   perps: {
     title: 'Perps Agent',
-    description: 'Monitor and analyze your live perps exposure.',
+    description: 'Monitor and analyze your live perps exposure',
   },
   poliet: {
     title: 'Picker Agent',
@@ -41,6 +42,10 @@ const defaultInitialState: PageInfoState = {
   points: {
     title: 'Points',
     description: 'Recharge credits and view points history',
+  },
+  token: {
+    title: 'BSC State-Scanner',
+    description: 'Live on-chain filtering for the most liquid assets on BNB Chain',
   },
 };
 
@@ -72,6 +77,10 @@ const getTranslatedInitialState = (locale?: keyof typeof locales): PageInfoState
     points: {
       title: messages.pageInfo?.points?.title || defaultInitialState.points.title,
       description: messages.pageInfo?.points?.description || defaultInitialState.points.description,
+    },
+    token: {
+      title: messages.pageInfo?.token?.title || defaultInitialState.token.title,
+      description: messages.pageInfo?.token?.description || defaultInitialState.token.description,
     },
   };
 };

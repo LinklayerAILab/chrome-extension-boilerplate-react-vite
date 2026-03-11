@@ -45,8 +45,9 @@ export const zh: LocaleMessages = {
     api: 'API',
     earn: '收益',
     perps: '永续',
-    poliet: 'Poliet',
+    poliet: 'Piloter',
     points: '积分',
+    token: 'BRC20',
   },
   strategy: {
     types: {
@@ -182,6 +183,9 @@ export const zh: LocaleMessages = {
     type: '类型',
     points: '积分',
     lpDepth: 'LP 深度',
+    lpStability: 'LP 稳定性',
+    optimal: '最佳',
+    trade: '交易',
     time5m: '5分钟',
     closeDialog: '关闭对话框',
     close: '关闭',
@@ -212,6 +216,8 @@ export const zh: LocaleMessages = {
     scanTip: '打开 LinkLayer AI 查看完整报告。',
     download: '下载',
     trading: '交易',
+    token: 'BSC 状态扫描器',
+    tokenDesc: '实时链上筛选 BNB 链上最具流动性的资产',
   },
   home: {
     retroactiveBonus: '追溯奖金',
@@ -267,14 +273,14 @@ export const zh: LocaleMessages = {
     },
     earn: {
       title: '赚取 LLAx',
-      description: '从过去的永续合约损失和月度交易记录中领取 LLAx。',
+      description: '从过去的永续合约损失和月度交易记录中领取 LLAx',
     },
     perps: {
       title: '永续代理',
-      description: '监控和分析您的实时永续合约敞口。',
+      description: '监控和分析您的实时永续合约敞口',
     },
     poliet: {
-      title: '选币代理',
+      title: 'CEX 代理',
       description: '分析币安现货和期货市场',
     },
     points: {

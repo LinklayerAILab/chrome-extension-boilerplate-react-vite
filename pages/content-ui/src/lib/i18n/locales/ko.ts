@@ -47,6 +47,7 @@ export const ko: LocaleMessages = {
     perps: '무기한',
     poliet: '폴리엣',
     points: '포인트',
+    token: 'BRC20',
   },
   strategy: {
     types: {
@@ -182,6 +183,9 @@ export const ko: LocaleMessages = {
     type: '유형',
     points: '포인트',
     lpDepth: 'LP 깊이',
+    lpStability: 'LP 안정성',
+    optimal: '최적',
+    trade: '거래',
     time5m: '5분',
     closeDialog: '대화 상자 닫기',
     close: '닫기',
@@ -212,6 +216,8 @@ export const ko: LocaleMessages = {
     scanTip: 'LinkLayer AI에서 전체 보고서를 확인하세요.',
     download: '다운로드',
     trading: '거래',
+    token: 'BSC 상태 스캐너',
+    tokenDesc: 'BNB 체인에서 유동성이 가장 높은 자산을 위한 실시간 온체인 필터링',
   },
   home: {
     retroactiveBonus: '소급 보너스',
@@ -267,14 +273,14 @@ export const ko: LocaleMessages = {
     },
     earn: {
       title: 'LLAx 적립',
-      description: '과거 영구 손실과 월간 거래 기록에서 LLAx를 청구하세요.',
+      description: '과거 영구 손실과 월간 거래 기록에서 LLAx를 청구하세요',
     },
     perps: {
       title: '영구 에이전트',
-      description: '실시 영구 포지션을 모니터링하고 분석하세요.',
+      description: '실시 영구 포지션을 모니터링하고 분석하세요',
     },
     poliet: {
-      title: '피커 에이전트',
+      title: 'CEX 에이전트',
       description: '바이낸스 현물 및 선물 시장 분석',
     },
     points: {

@@ -573,6 +573,10 @@ const Typewriter = ({
     window.open(`https://www.binance.com/en/trade/${symbol}_USDT?type=spot`, '_blank');
   };
 
+  const handleComingSoon = () => {
+    message.info('Coming soon');
+  };
+
   const hasMessageData = useMemo(() => {
     return status === 'loading' || Boolean(messages?.length) || Boolean(text?.length);
   }, [status, messages, text]);
@@ -673,7 +677,7 @@ const Typewriter = ({
               </svg>
             </div>
             <div
-              onClick={handleShowDialog}
+              onClick={handleComingSoon}
               aria-label="Share"
               className="flex h-[38px] w-full cursor-pointer items-center justify-between gap-4 rounded-[8px] bg-[#F3F3F3] px-[14px] transition-colors hover:bg-[#e5e5e5]">
               {labels.shareReport}

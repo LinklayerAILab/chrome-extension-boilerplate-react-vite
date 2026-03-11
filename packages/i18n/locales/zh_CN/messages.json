@@ -1,0 +1,45 @@
+{
+  "extensionDescription": {
+    "description": "Extension description",
+    "message": "使用 Vite、React 和 TypeScript 开发的 Chrome 扩展程序"
+  },
+  "extensionName": {
+    "description": "Extension name",
+    "message": "Chrome 扩展程序"
+  },
+  "toggleTheme": {
+    "message": "切换主题"
+  },
+  "injectButton": {
+    "message": "点击注入内容脚本"
+  },
+  "greeting": {
+    "description": "Greeting message",
+    "message": "你好，我的名字是 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "张三"
+      }
+    }
+  },
+  "hello": {
+    "description": "Placeholder example",
+    "message": "你好 $1"
+  },
+  "displayErrorInfo": {
+    "message": "发生错误"
+  },
+  "displayErrorDescription": {
+    "message": "抱歉，加载页面时出现了问题。"
+  },
+  "displayErrorDetailsInfo": {
+    "message": "错误详情："
+  },
+  "displayErrorUnknownErrorInfo": {
+    "message": "未知错误"
+  },
+  "displayErrorReset": {
+    "message": "重新运行"
+  }
+}
