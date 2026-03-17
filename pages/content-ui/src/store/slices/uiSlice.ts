@@ -7,7 +7,7 @@ type UiState = {
 };
 
 const initialState: UiState = {
-  selectedMenuId: 1,
+  selectedMenuId: 7,
   isSidePanelOpen: false,
 };
 

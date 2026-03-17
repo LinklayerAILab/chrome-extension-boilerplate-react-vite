@@ -165,7 +165,7 @@ const getProviderId = async (): Promise<string | null> => {
     });
 
     if (response.success && response.result) {
-      console.log('[App] Provider ID:', response.result);
+      // console.log('[App] Provider ID:', response.result);
       return response.result;
     }
     return null;
@@ -480,7 +480,7 @@ const SidePanelContentInner = () => {
                 setIsConnected(false);
                 setProviderId(null);
                 await WalletStorage.clearWalletState();
-              } else if (currentAccounts[0].toLowerCase() !== savedState.address.toLowerCase()) {
+              } else if (savedState.address && currentAccounts[0].toLowerCase() !== savedState.address.toLowerCase()) {
                 // 账户已切换
                 setWalletAddress(currentAccounts[0]);
                 const newChainId = await getCurrentChainId(savedState.providerId || undefined);

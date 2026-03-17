@@ -8,12 +8,10 @@ import { message } from '@src/ui';
 import { useI18n } from '@src/lib/i18n';
 import Dialog from './Dialog';
 
-const tradingIcon = chrome.runtime.getURL('content-ui/agent/trading.svg');
-const llIcon = chrome.runtime.getURL('content-ui/agent/ll.svg');
 const llText = chrome.runtime.getURL('content-ui/agent/llicon.svg');
 const offIcon = chrome.runtime.getURL('content-ui/agent/off.svg');
 const bigLogo = chrome.runtime.getURL('content-ui/agent/biglogo.svg');
-const codeIcon = chrome.runtime.getURL('content-ui/agent/code.png');
+const codeIcon = chrome.runtime.getURL('content-ui/points/code.jpg');
 const noDataIcon = chrome.runtime.getURL('content-ui/agent/noData.svg');
 
 export interface MessageChunk {
@@ -462,8 +460,8 @@ const Typewriter = ({
       if (codeImg) {
         console.log('[Typewriter][Download] found code image');
         (codeImg as HTMLElement).style.cssText = `
-          width: 100px !important;
-          height: 100px !important;
+          width: 120px !important;
+          height: 140px !important;
           object-fit: contain !important;
           display: block !important;
           visibility: visible !important;
@@ -516,8 +514,8 @@ const Typewriter = ({
               img.style.display = 'block';
               img.style.visibility = 'visible';
               img.style.opacity = '1';
-              img.style.width = img.getAttribute('width') || '100px';
-              img.style.height = img.getAttribute('height') || '100px';
+              img.style.width = img.getAttribute('width') || '120px';
+              img.style.height = img.getAttribute('height') || '140px';
               img.style.objectFit = 'contain';
             });
           },
@@ -769,7 +767,7 @@ const Typewriter = ({
               }}>
               <div className="border-b-solid flex min-w-0 items-center justify-between gap-4 border-b border-[#eee] py-[20px] pb-[14px]">
                 <div className="flex min-w-0 flex-1 items-center">
-                  <img src={bigLogo} className="h-[100px] w-[100px] flex-shrink-0 lg:h-[100px] lg:w-[100px]" alt="" />
+                  <img src={bigLogo} className="flex-shrink-0 lg:h-[100px] lg:w-[100px]" alt="" />
                   <div className="flex min-w-0 flex-1 flex-col justify-center pl-4">
                     <div className="flex flex-col gap-2">
                       <div className="text-[14px] font-bold lg:text-[16px]">{labels.scanCode}</div>
@@ -782,7 +780,7 @@ const Typewriter = ({
                     width={100}
                     height={100}
                     src={codeIcon}
-                    className="h-[100px] w-[100px] object-contain lg:h-[100px] lg:w-[100px]"
+                    className="object-contain lg:h-[100px] lg:w-[100px]"
                     alt=""
                   />
                 </div>

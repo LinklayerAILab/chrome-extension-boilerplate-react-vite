@@ -149,7 +149,7 @@ export const zh: LocaleMessages = {
     myInvite: '我的邀请',
   },
   alpha: {
-    myAlphaHolding: '我的 Alpha 持仓',
+    myAlphaHolding: '我的 BNBChain Alpha 持仓',
     updateAgo: '{time}前更新',
     worstToken: '最差代币',
     noDataTitle: '暂无 Alpha 代币信息',

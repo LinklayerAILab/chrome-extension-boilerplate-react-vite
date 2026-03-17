@@ -7,6 +7,8 @@ import { query_tasks } from '@src/api/agent_c';
 import type { QueryTasksItem, QueryTasksParams, QueryTasksResponse, QueryTasksType } from '@src/api/agent_c';
 import { usePageInfoUpdate } from '@src/lib/hooks/usePageInfoUpdate';
 const bookIcon = chrome.runtime.getURL('content-ui/points/book.svg');
+const percent12 = chrome.runtime.getURL('content-ui/points/12percent.svg');
+const percent20 = chrome.runtime.getURL('content-ui/points/20percent.svg');
 type ListItem = {
   value: number;
   select: boolean;
@@ -80,19 +82,19 @@ export const Points = () => {
       value: 1,
       select: true,
       money: '9.9',
-      count: 900,
+      count: 1200,
     },
     {
       value: 2,
       select: false,
       money: '29.9',
-      count: 3200,
+      count: 3400,
     },
     {
       value: 3,
       select: false,
-      money: '49.9',
-      count: 6000,
+      money: '99.9',
+      count: 12500,
     },
   ]);
 
@@ -220,9 +222,11 @@ export const Points = () => {
                     />
                   </div>
                   {item.count}
+                  {item.value === 2 && <img src={percent12} className="ml-[50px] h-[14px]"></img>}
+                  {item.value === 3 && <img src={percent20} className="ml-[45px] h-[14px]"></img>}
                 </div>
                 <div className="flex items-center gap-[0.5vh]">
-                  <span>$ {item.money}</span>
+                  <span className="text-[14px]">${item.money}</span>
                   <div
                     className={`flex h-[2.2vh] w-[2.2vh] items-center justify-center rounded-full border-[2px] border-solid border-black ${
                       item.select ? 'bg-[#DFFF67]' : ''

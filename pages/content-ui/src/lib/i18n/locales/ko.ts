@@ -149,7 +149,7 @@ export const ko: LocaleMessages = {
     myInvite: '내 초대',
   },
   alpha: {
-    myAlphaHolding: '내 알파 보유',
+    myAlphaHolding: '내 BNBChain Alpha 보유',
     updateAgo: '{time} 전 업데이트',
     worstToken: '최악 토큰',
     noDataTitle: '알파 토큰 정보 없음',

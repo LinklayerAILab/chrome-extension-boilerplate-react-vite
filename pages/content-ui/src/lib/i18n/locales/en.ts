@@ -149,7 +149,7 @@ export const en: LocaleMessages = {
     myInvite: 'My Invite',
   },
   alpha: {
-    myAlphaHolding: 'My Alpha Holding',
+    myAlphaHolding: 'My BNBChain Alpha Holding',
     updateAgo: 'Update {time} ago',
     worstToken: 'Worst Token',
     noDataTitle: 'No alpha token information',

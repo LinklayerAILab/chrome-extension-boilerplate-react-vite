@@ -149,7 +149,7 @@ export const ru: LocaleMessages = {
     myInvite: 'Мои приглашения',
   },
   alpha: {
-    myAlphaHolding: 'Мои Alpha позиции',
+    myAlphaHolding: 'Мои позиции Alpha на BNBChain',
     updateAgo: 'Обновлено {time} назад',
     worstToken: 'Худший токен',
     noDataTitle: 'Нет информации об альфа-токенах',

@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { store } from '@src/store';
+import type { BinanceTokenScreenItem } from '@src/api/agent_c';
+import { getBinanceTokenScreen } from '@src/api/agent_c';
 import { setSelectedMenuId, setSidePanelOpen } from '@src/store/slices/uiSlice';
+import { setTokenList } from '@src/store/slices/tokenSlice';
 import { StatusIndicator } from './StatusIndicator';
 // 检测 Twitter/X 平台的主题
 
@@ -171,6 +174,7 @@ const topDark = chrome.runtime.getURL('content-ui/xInject/top-dark.svg');
 const topLight = chrome.runtime.getURL('content-ui/xInject/top-light.svg');
 const greenDark = chrome.runtime.getURL('content-ui/xInject/green-dark.svg');
 const greenLight = chrome.runtime.getURL('content-ui/xInject/green-light.svg');
+const defaultTokenLogo = chrome.runtime.getURL('content-ui/coins/bnb.svg');
 
 // 注入组件专用样式
 const injectStyles = (lightBgImage: string, darkBgImage: string) => {
@@ -373,6 +377,12 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
     align-items: center;
     gap: 4px;
   }
+     .inject-X-list-card-top-coin img {
+      width:24px;
+      height:24px;
+      border-radius:100%;
+      background:white;
+     }
   .inject-X-list-card-top-status{
     display: flex;
     align-items: center;
@@ -517,6 +527,7 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
 // X 平台 React 组件
 export const XPlatformComponent = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>(getSystemTheme);
+  const [tokens, setTokens] = useState<BinanceTokenScreenItem[]>(() => store.getState().tokens.tokenList);
 
   useEffect(() => {
     const updateTheme = () => setTheme(getSystemTheme());
@@ -552,13 +563,42 @@ export const XPlatformComponent = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = store.subscribe(() => {
+      setTokens(store.getState().tokens.tokenList);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const fetchTokens = async () => {
+      try {
+        const screenResponse = await getBinanceTokenScreen();
+        const tokenList = screenResponse.data?.results ?? [];
+        if (isActive) {
+          store.dispatch(setTokenList(tokenList));
+        }
+      } catch (error) {
+        console.error('Failed to load token list:', error);
+        if (isActive) {
+          store.dispatch(setTokenList([]));
+        }
+      }
+    };
+
+    fetchTokens();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const themeClass = theme === 'light' ? 'light' : 'dark';
 
   return (
     <>
       <div
         className={`x-platform-container ${themeClass}`}
-        style={{ marginTop: 60 }}
         onClick={() => {
           console.log('[XPlatform] Component clicked, current theme:', theme);
           // 添加点击事件处理逻辑
@@ -592,21 +632,21 @@ export const XPlatformComponent = () => {
                 <div className="x-platform-token-chart-top">
                   <div>
                     <div className="x-platform-token-chart-top-label">Healthy Token</div>
-                    <div className="x-platform-token-chart-top-value">18</div>
+                    <div className="x-platform-token-chart-top-value">{tokens.length}</div>
                   </div>
                   <div>
                     <div className="x-platform-token-chart-top-label">Active Pools</div>
-                    <div className="x-platform-token-chart-top-value">108</div>
+                    <div className="x-platform-token-chart-top-value">-</div>
                   </div>
                 </div>
                 <div className="x-platform-token-chart-bottom">
                   <div>
                     <div className="x-platform-token-chart-bottom-label">Total Liquidity</div>
-                    <div className="x-platform-token-chart-bottom-value">42M</div>
+                    <div className="x-platform-token-chart-bottom-value">-</div>
                   </div>
                   <div>
                     <div className="x-platform-token-chart-bottom-label">Avg Exit Cost</div>
-                    <div className="x-platform-token-chart-bottom-value">1.8%</div>
+                    <div className="x-platform-token-chart-bottom-value">-</div>
                   </div>
                 </div>
               </div>
@@ -628,15 +668,14 @@ export const XPlatformComponent = () => {
             </div>
           </div>
           <div className="x-platform-list-content">
-            <InjectXListCard theme={theme} logo={chrome.runtime.getURL('content-ui/xInject/aster.svg')} name="Aster" />
-            <InjectXListCard theme={theme} logo={chrome.runtime.getURL('content-ui/xInject/hana.svg')} name="Hana" />
-            <InjectXListCard
-              theme={theme}
-              logo={chrome.runtime.getURL('content-ui/xInject/fandom.svg')}
-              name="Fandom"
-            />
-            <InjectXListCard theme={theme} logo={chrome.runtime.getURL('content-ui/xInject/bob.svg')} name="Bob" />
-            <InjectXListCard theme={theme} logo={chrome.runtime.getURL('content-ui/xInject/koge.svg')} name="Koge" />
+            {tokens.slice(0, 5).map(token => (
+              <InjectXListCard
+                key={token.contractAddress || token.tokenId}
+                theme={theme}
+                logo={token.imageUrl || defaultTokenLogo}
+                name={token.tokenSymbol}
+              />
+            ))}
           </div>
           <div
             className="x-platform-inject-go"
@@ -674,7 +713,7 @@ function InjectXListCard({ theme, logo, name }: { theme: 'light' | 'dark'; logo:
       <div className="inject-X-list-card-top">
         <div className="inject-X-list-card-top-coin">
           <img src={logo} alt="" />
-          {name}
+          {name.toUpperCase()}
         </div>
         <div className="inject-X-list-card-top-status" style={{ fontWeight: 'bold' }}>
           <div

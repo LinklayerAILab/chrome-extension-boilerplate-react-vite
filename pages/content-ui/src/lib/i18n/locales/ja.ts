@@ -149,7 +149,7 @@ export const ja: LocaleMessages = {
     myInvite: 'マイ招待',
   },
   alpha: {
-    myAlphaHolding: 'マイアルファ保有',
+    myAlphaHolding: '私の BNBChain Alpha 保有',
     updateAgo: '{time}前に更新',
     worstToken: '最悪トークン',
     noDataTitle: 'アルファトークン情報がありません',

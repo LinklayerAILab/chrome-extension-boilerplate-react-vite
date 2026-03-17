@@ -1,40 +1,74 @@
+import { getBinanceTokenPrice, getBinanceTokenScreen, BinanceTokenScreenItem } from '@src/api/agent_c';
 import { useI18n } from '@src/lib/i18n';
 import { setPageInfo } from '@src/store/slices/pageInfoSlice';
-import { Button } from '@src/ui';
-import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { setTokenList } from '@src/store/slices/tokenSlice';
+import { Button, Skeleton } from '@src/ui';
+import { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { StatusIndicator } from './StatusIndicator';
+import type { RootState } from '@src/store';
+
 const topLight = chrome.runtime.getURL('content-ui/xInject/top-light.svg');
 const priceIcon = chrome.runtime.getURL('content-ui/token/price.svg');
-// TokenCard 组件
+const defaultTokenLogo = chrome.runtime.getURL('content-ui/coins/bnb.svg');
+
 interface TokenCardProps {
   name: string;
-  symbol: string;
-  price: string;
+  price?: number;
   logo: string;
+  contractAddress: string;
 }
 
-const TokenCard = ({ name, symbol, price, logo }: TokenCardProps) => {
+const TokenCard = ({ name, contractAddress, price, logo }: TokenCardProps) => {
   const { t } = useI18n();
 
-  // 安全检查：确保翻译对象存在
   const optimal = t.common?.optimal || 'Optimal';
   const lpDepth = t.common?.lpDepth || 'LP Depth';
   const lpStability = t.common?.lpStability || 'LP Stability';
   const trade = t.common?.trade || 'Trade';
   const agent = t.common?.agent || 'Agent';
+  const formatPriceTruncate = (value: number, decimals: number) => {
+    const factor = 10 ** decimals;
+    const truncated = Math.trunc(value * factor) / factor;
+    return truncated.toFixed(decimals);
+  };
+  const priceText = price !== undefined ? formatPriceTruncate(price, 6) : '--';
+  const toPlainString = (value: number) => {
+    if (!Number.isFinite(value)) {
+      return String(value);
+    }
+    const fixed = value.toFixed(18);
+    return fixed.replace(/\.?0+$/, '');
+  };
+  const priceTitle = price !== undefined ? toPlainString(price) : '--';
+  const displayName = name.length > 15 ? `${name.slice(0, 15)}...` : name;
+  const handleTrade = () => {
+    window.open(
+      `https://pancakeswap.finance/swap?inputCurrency=0x55d398326f99059fF775485246999027B3197955&outputCurrency=${contractAddress}`,
+      '_blank',
+    );
+  };
 
   return (
     <div className="token-card flex rounded-lg bg-[#F4F4F4] p-[14px]">
       <div className="border-r-solid flex w-[310px] flex-col border-r-[1px] border-r-[#Eeee] pr-[14px]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-[4px]">
-            <img src={logo} alt={`${name} logo`} className="h-[30px] w-[30px]" />
-            <span className="text-[13px] font-bold">{name}</span>
+            <img
+              src={logo || defaultTokenLogo}
+              alt={`${name} logo`}
+              className="h-[30px] w-[30px] rounded-full bg-white"
+            />
+            <div className="flex flex-col gap-1">
+              <div className="w-full text-[13px] font-bold" title={name.toUpperCase()}>
+                {displayName.toUpperCase()}
+              </div>
+              <div className="flex w-full items-center text-[10px] font-bold" title={priceTitle}>
+                <img src={priceIcon} alt="Price" className="h-[12px] w-[12px]" /> ${priceText}
+              </div>
+            </div>
           </div>
-          <span className="flex items-center text-[10px] font-bold">
-            <img src={priceIcon} alt="Price" className="h-[12px] w-[12px]" /> ${price}
-          </span>
+
           <div className="flex items-center gap-[4px] text-[12px]">
             <StatusIndicator size={22} borderWidth={1} statusColor="GREEN" /> {optimal}
           </div>
@@ -49,7 +83,7 @@ const TokenCard = ({ name, symbol, price, logo }: TokenCardProps) => {
         </div>
       </div>
       <div className="flex w-[100px] flex-col gap-[14px] pl-[14px]">
-        <Button size="small" style={{ height: 30 }}>
+        <Button size="small" style={{ height: 30 }} onClick={handleTrade}>
           {trade}
         </Button>
         <Button size="small" style={{ height: 30 }} type="primary">
@@ -60,69 +94,43 @@ const TokenCard = ({ name, symbol, price, logo }: TokenCardProps) => {
   );
 };
 
+const TokenCardSkeleton = () => {
+  return (
+    <div className="token-card flex rounded-lg bg-[#F4F4F4] p-[14px]">
+      <div className="border-r-solid flex w-[310px] flex-col border-r-[1px] border-r-[#Eeee] pr-[14px]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-[4px]">
+            <Skeleton.Circle className="h-[30px] w-[30px]" />
+            <div className="flex flex-col items-center gap-2">
+              <Skeleton.Text className="h-4 w-20" />
+              <Skeleton.Text className="h-3 w-16" />
+            </div>
+          </div>
+          <div className="flex items-center gap-[4px]">
+            <Skeleton.Circle className="h-[22px] w-[22px]" />
+            <Skeleton.Text className="h-3 w-14" />
+          </div>
+        </div>
+        <div className="mt-[10px] flex items-center gap-[14px] rounded-lg pt-[10px]">
+          <Skeleton className="h-[26px] flex-1 rounded-[15px]" />
+          <Skeleton className="h-[26px] flex-1 rounded-[15px]" />
+        </div>
+      </div>
+      <div className="flex w-[100px] flex-col gap-[14px] pl-[14px]">
+        <Skeleton.Button style={{ height: 30 }} />
+        <Skeleton.Button style={{ height: 30 }} />
+      </div>
+    </div>
+  );
+};
+
 export const Token = () => {
   const { t } = useI18n();
   const dispatch = useDispatch();
 
-  // 模拟代币数据
-  const tokens = [
-    {
-      name: 'Aster',
-      symbol: 'ASTR',
-      price: '0.65',
-      logo: chrome.runtime.getURL('content-ui/xInject/aster.svg'),
-    },
-    {
-      name: 'Hana',
-      symbol: 'Hana',
-      price: '68.45',
-      logo: chrome.runtime.getURL('content-ui/xInject/hana.svg'), // 临时使用相同的 logo
-    },
-    {
-      name: 'Fandom',
-      symbol: 'Fandom',
-      price: '125',
-      logo: chrome.runtime.getURL('content-ui/xInject/fandom.svg'), // 临时使用相同的 logo
-    },
-    {
-      name: 'Stable',
-      symbol: 'Stable',
-      price: '0.655',
-      logo: chrome.runtime.getURL('content-ui/xInject/stable.svg'), // 临时使用相同的 logo
-    },
-    {
-      name: 'Koge',
-      symbol: 'Koge',
-      price: '12',
-      logo: chrome.runtime.getURL('content-ui/xInject/koge.svg'), // 临时使用相同的 logo
-    },
-    {
-      name: 'CAKE',
-      symbol: 'CAKE',
-      price: '2.45',
-      change24h: '-1.23',
-      volume24h: '234M',
-      logo: chrome.runtime.getURL('content-ui/xInject/bnb.svg'), // 临时使用相同的 logo
-    },
-    {
-      name: 'Wod',
-      symbol: 'Wod',
-      price: '12',
-      logo: chrome.runtime.getURL('content-ui/xInject/wod.svg'), // 临时使用相同的 logo
-    },
-    {
-      name: 'Bob',
-      symbol: 'Bob',
-      price: '5.98',
-      logo: chrome.runtime.getURL('content-ui/xInject/bob.svg'), // 临时使用相同的 logo
-    },
-    {
-      name: 'River',
-      symbol: 'River',
-      price: '4.58',
-      logo: chrome.runtime.getURL('content-ui/xInject/river.svg'), // 临时使用相同的 logo
-    },
-  ];
+  const tokenList = useSelector((state: RootState) => state.tokens.tokenList);
+  const [tokens, setTokens] = useState<BinanceTokenScreenItem[]>(tokenList);
+  const [listLoading, setListLoading] = useState(false);
 
   useEffect(() => {
     dispatch(
@@ -136,12 +144,72 @@ export const Token = () => {
     );
   }, [t]);
 
+  useEffect(() => {
+    setTokens(tokenList);
+  }, [tokenList]);
+
+  useEffect(() => {
+    let isActive = true;
+    const fetchTokens = async () => {
+      const hasCachedTokens = tokenList.length > 0;
+      if (!hasCachedTokens) {
+        setListLoading(true);
+      }
+      try {
+        const screenResponse = hasCachedTokens ? null : await getBinanceTokenScreen();
+        const freshTokenList = hasCachedTokens ? tokenList : (screenResponse?.data?.results ?? []);
+        if (isActive && !hasCachedTokens) {
+          setTokens(freshTokenList);
+          dispatch(setTokenList(freshTokenList));
+          setListLoading(false);
+        }
+        const tokenAddresses = freshTokenList
+          .map(token => token.contractAddress)
+          .filter((address): address is string => Boolean(address));
+        if (tokenAddresses.length > 0) {
+          try {
+            const priceResponse = await getBinanceTokenPrice(tokenAddresses);
+            const priceMap = new Map((priceResponse.data?.prices ?? []).map(item => [item.token_address, item.price]));
+            if (isActive) {
+              setTokens(prev =>
+                prev.map(token => ({
+                  ...token,
+                  price: priceMap.get(token.contractAddress) ?? token.price,
+                })),
+              );
+            }
+          } catch (error) {
+            console.error('Failed to load token prices:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load token list:', error);
+        if (isActive) {
+          setTokens([]);
+          setListLoading(false);
+        }
+      }
+    };
+
+    fetchTokens();
+    return () => {
+      isActive = false;
+    };
+  }, [dispatch, tokenList]);
+
   return (
     <div className="token-container">
       <div className="token-list-box mb-[20px] flex flex-col gap-[14px]">
-        {tokens.map((token, index) => (
-          <TokenCard key={index} name={token.name} symbol={token.symbol} price={token.price} logo={token.logo} />
-        ))}
+        {listLoading &&
+          Array.from({ length: 4 }).map((_, index) => <TokenCardSkeleton key={`token-skeleton-${index}`} />)}
+        {!listLoading &&
+          tokens.map(token => {
+            const name = token.tokenSymbol;
+            const logo = token.imageUrl;
+            const key = token.contractAddress;
+
+            return <TokenCard key={key} name={name} contractAddress={key} price={token.price} logo={logo} />;
+          })}
       </div>
     </div>
   );

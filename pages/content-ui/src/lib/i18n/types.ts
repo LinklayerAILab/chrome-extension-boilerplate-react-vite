@@ -181,6 +181,9 @@ export interface LocaleMessages {
     points: string;
     lpDepth: string;
     time5m: string;
+    optimal: string;
+    lpStability: string;
+    trade: string;
   };
   agent: {
     tokenName: string;
@@ -208,6 +211,8 @@ export interface LocaleMessages {
     scanTip: string;
     download: string;
     trading: string;
+    token: string;
+    tokenDesc: string;
   };
   home: {
     retroactiveBonus: string;
