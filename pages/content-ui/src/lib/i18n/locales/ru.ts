@@ -47,7 +47,7 @@ export const ru: LocaleMessages = {
     perps: 'Перпсы',
     poliet: 'Piloter',
     points: 'Баллы',
-    token: 'BRC20',
+    token: 'BEP20',
   },
   strategy: {
     types: {
@@ -149,7 +149,7 @@ export const ru: LocaleMessages = {
     myInvite: 'Мои приглашения',
   },
   alpha: {
-    myAlphaHolding: 'Мои позиции Alpha на BNBChain',
+    myAlphaHolding: 'Мои позиции Alpha на BSC',
     updateAgo: 'Обновлено {time} назад',
     worstToken: 'Худший токен',
     noDataTitle: 'Нет информации об альфа-токенах',
@@ -216,8 +216,11 @@ export const ru: LocaleMessages = {
     scanTip: 'Откройте LinkLayer AI, чтобы просмотреть полный отчет.',
     download: 'Скачать',
     trading: 'Торговля',
+    update: 'Обновить',
     token: 'BSC сканер состояния',
     tokenDesc: 'Фильтрация ликвидных активов BNB Chain в реальном времени',
+    inputPlaceholder: 'Введите запрос анализа...',
+    startAnalysis: 'Начать анализ',
   },
   home: {
     retroactiveBonus: 'Ретробонус',

@@ -47,7 +47,7 @@ export const ko: LocaleMessages = {
     perps: '무기한',
     poliet: '폴리엣',
     points: '포인트',
-    token: 'BRC20',
+    token: 'BEP20',
   },
   strategy: {
     types: {
@@ -149,7 +149,7 @@ export const ko: LocaleMessages = {
     myInvite: '내 초대',
   },
   alpha: {
-    myAlphaHolding: '내 BNBChain Alpha 보유',
+    myAlphaHolding: '내 BSC Alpha 보유',
     updateAgo: '{time} 전 업데이트',
     worstToken: '최악 토큰',
     noDataTitle: '알파 토큰 정보 없음',
@@ -216,8 +216,11 @@ export const ko: LocaleMessages = {
     scanTip: 'LinkLayer AI에서 전체 보고서를 확인하세요.',
     download: '다운로드',
     trading: '거래',
+    update: '업데이트',
     token: 'BSC 상태 스캐너',
     tokenDesc: 'BNB 체인에서 유동성이 가장 높은 자산을 위한 실시간 온체인 필터링',
+    inputPlaceholder: '분석 요청을 입력하세요...',
+    startAnalysis: '분석 시작',
   },
   home: {
     retroactiveBonus: '소급 보너스',

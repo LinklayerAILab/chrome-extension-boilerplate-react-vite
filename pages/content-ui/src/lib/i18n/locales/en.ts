@@ -47,7 +47,7 @@ export const en: LocaleMessages = {
     perps: 'Perps',
     poliet: 'Piloter',
     points: 'Points',
-    token: 'BRC20',
+    token: 'BEP20',
   },
   strategy: {
     types: {
@@ -149,7 +149,7 @@ export const en: LocaleMessages = {
     myInvite: 'My Invite',
   },
   alpha: {
-    myAlphaHolding: 'My BNBChain Alpha Holding',
+    myAlphaHolding: 'My BSC Alpha Holding',
     updateAgo: 'Update {time} ago',
     worstToken: 'Worst Token',
     noDataTitle: 'No alpha token information',
@@ -216,8 +216,11 @@ export const en: LocaleMessages = {
     scanTip: 'Open LinkLayer AI to view the full report.',
     download: 'Download',
     trading: 'Trading',
-    token: 'BSC State-Scanner',
+    token: 'BEP20 Liquidity Leader',
+    update: 'Update',
     tokenDesc: 'Live on-chain filtering for the most liquid assets on BNB Chain',
+    inputPlaceholder: 'Enter your analysis request...',
+    startAnalysis: 'Start Analysis',
   },
   home: {
     retroactiveBonus: 'Retroactive Bonus',

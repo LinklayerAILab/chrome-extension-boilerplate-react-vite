@@ -47,7 +47,7 @@ export const zh: LocaleMessages = {
     perps: '永续',
     poliet: 'Piloter',
     points: '积分',
-    token: 'BRC20',
+    token: 'BEP20',
   },
   strategy: {
     types: {
@@ -149,7 +149,7 @@ export const zh: LocaleMessages = {
     myInvite: '我的邀请',
   },
   alpha: {
-    myAlphaHolding: '我的 BNBChain Alpha 持仓',
+    myAlphaHolding: '我的 BSC Alpha 持仓',
     updateAgo: '{time}前更新',
     worstToken: '最差代币',
     noDataTitle: '暂无 Alpha 代币信息',
@@ -216,8 +216,11 @@ export const zh: LocaleMessages = {
     scanTip: '打开 LinkLayer AI 查看完整报告。',
     download: '下载',
     trading: '交易',
+    update: '更新',
     token: 'BSC 状态扫描器',
     tokenDesc: '实时链上筛选 BNB 链上最具流动性的资产',
+    inputPlaceholder: '请输入你的分析请求...',
+    startAnalysis: '开始分析',
   },
   home: {
     retroactiveBonus: '追溯奖金',

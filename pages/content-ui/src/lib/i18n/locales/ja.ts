@@ -47,7 +47,7 @@ export const ja: LocaleMessages = {
     perps: '無期限',
     poliet: 'ポリエ',
     points: 'ポイント',
-    token: 'BRC20',
+    token: 'BEP20',
   },
   strategy: {
     types: {
@@ -149,7 +149,7 @@ export const ja: LocaleMessages = {
     myInvite: 'マイ招待',
   },
   alpha: {
-    myAlphaHolding: '私の BNBChain Alpha 保有',
+    myAlphaHolding: '私の BSC Alpha 保有',
     updateAgo: '{time}前に更新',
     worstToken: '最悪トークン',
     noDataTitle: 'アルファトークン情報がありません',
@@ -194,7 +194,7 @@ export const ja: LocaleMessages = {
     tokenName: 'トークン',
     currentPrice: '現在価格',
     contract: '契約',
-    analyze: 'はい',
+    analyze: '分析する',
     analyzing: '分析中...',
     analyzeCoin: 'トークン分析',
     recommendCoin: '推奨トークン',
@@ -216,8 +216,11 @@ export const ja: LocaleMessages = {
     scanTip: 'LinkLayer AI で完全なレポートをご確認ください。',
     download: 'ダウンロード',
     trading: '取引',
+    update: '更新',
     token: 'BSC状態スキャナー',
     tokenDesc: 'BNBチェーンで最も流動性の高い資産のリアルタイムオンチェーンフィルタリング',
+    inputPlaceholder: '分析リクエストを入力...',
+    startAnalysis: '分析を開始',
   },
   home: {
     retroactiveBonus: 'レトロボーナス',
