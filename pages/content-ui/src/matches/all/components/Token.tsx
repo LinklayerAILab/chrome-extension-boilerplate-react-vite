@@ -20,12 +20,11 @@ interface TokenCardProps {
   logo: string;
   contractAddress: string;
   tokenData?: BinanceTokenScreenItem;
+  isLogin: boolean;
 }
 
-const TokenCard = ({ name, contractAddress, price, logo, tokenData }: TokenCardProps) => {
+const TokenCard = ({ name, contractAddress, price, logo, tokenData, isLogin }: TokenCardProps) => {
   const { t } = useI18n();
-
-  const isLogin = useSelector((state: RootState) => !!state.user.access_token);
 
   const optimal = t.common?.optimal || 'Optimal';
   const lpDepth = t.common?.lpDepth || 'LP Depth';
@@ -151,6 +150,7 @@ const TokenCardSkeleton = () => {
 export const Token = () => {
   const { t } = useI18n();
   const dispatch = useDispatch();
+  const isLogin = useSelector((state: RootState) => !!state.user.access_token);
   const time = chrome.runtime.getURL('content-ui/alpha/time.svg');
   const tokenList = useSelector((state: RootState) => state.tokens.tokenList);
   const [tokens, setTokens] = useState<BinanceTokenScreenItem[]>(tokenList);
@@ -273,6 +273,7 @@ export const Token = () => {
                 price={token.price}
                 logo={logo}
                 tokenData={token}
+                isLogin={isLogin}
               />
             );
           })}
