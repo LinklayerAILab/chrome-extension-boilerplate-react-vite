@@ -251,7 +251,7 @@ export const Token = () => {
   return (
     <div className="token-container">
       <div className="mb-2 flex items-center justify-between text-black">
-        <div className="text-[13px] font-bold">{t.agent?.update || 'My Alpha Holding'}</div>
+        <div className="text-[13px] font-bold">{t.agent?.update || 'Update'}</div>
         <div className="flex items-center gap-2">
           <img src={time} alt="Time Icon" className="h-[14px] w-[14px] text-[12px]" /> {relativeTime}
         </div>
