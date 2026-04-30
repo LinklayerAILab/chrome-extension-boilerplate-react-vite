@@ -1,4 +1,5 @@
-import { getBinanceTokenPrice, getBinanceTokenScreen, BinanceTokenScreenItem } from '@src/api/agent_c';
+import type { BinanceTokenScreenItem } from '@src/api/agent_c';
+import { getBinanceTokenPrice, getBinanceTokenScreen, getBinanceUpdateTime } from '@src/api/agent_c';
 import { useI18n } from '@src/lib/i18n';
 import { setPageInfo } from '@src/store/slices/pageInfoSlice';
 import { setTokenList } from '@src/store/slices/tokenSlice';
@@ -6,6 +7,7 @@ import { Button, Skeleton } from '@src/ui';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { StatusIndicator } from './StatusIndicator';
+import BinanceAnalysisModal from './BinanceAnalysisModal';
 import type { RootState } from '@src/store';
 
 const topLight = chrome.runtime.getURL('content-ui/xInject/top-light.svg');
@@ -17,16 +19,30 @@ interface TokenCardProps {
   price?: number;
   logo: string;
   contractAddress: string;
+  tokenData?: BinanceTokenScreenItem;
 }
 
-const TokenCard = ({ name, contractAddress, price, logo }: TokenCardProps) => {
+const TokenCard = ({ name, contractAddress, price, logo, tokenData }: TokenCardProps) => {
   const { t } = useI18n();
+
+  const isLogin = useSelector((state: RootState) => !!state.user.access_token);
 
   const optimal = t.common?.optimal || 'Optimal';
   const lpDepth = t.common?.lpDepth || 'LP Depth';
   const lpStability = t.common?.lpStability || 'LP Stability';
   const trade = t.common?.trade || 'Trade';
   const agent = t.common?.agent || 'Agent';
+
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+
+  const handleAgentClick = () => {
+    setIsAnalysisOpen(true);
+  };
+
+  const handleAnalysisClose = () => {
+    setIsAnalysisOpen(false);
+  };
+
   const formatPriceTruncate = (value: number, decimals: number) => {
     const factor = 10 ** decimals;
     const truncated = Math.trunc(value * factor) / factor;
@@ -86,10 +102,18 @@ const TokenCard = ({ name, contractAddress, price, logo }: TokenCardProps) => {
         <Button size="small" style={{ height: 30 }} onClick={handleTrade}>
           {trade}
         </Button>
-        <Button size="small" style={{ height: 30 }} type="primary">
+        <Button size="small" style={{ height: 30 }} type="primary" onClick={handleAgentClick}>
           {agent}
         </Button>
       </div>
+      {tokenData && isAnalysisOpen && (
+        <BinanceAnalysisModal
+          isOpen={isAnalysisOpen}
+          onClose={handleAnalysisClose}
+          token={tokenData}
+          isLogin={isLogin}
+        />
+      )}
     </div>
   );
 };
@@ -127,22 +151,49 @@ const TokenCardSkeleton = () => {
 export const Token = () => {
   const { t } = useI18n();
   const dispatch = useDispatch();
-
+  const time = chrome.runtime.getURL('content-ui/alpha/time.svg');
   const tokenList = useSelector((state: RootState) => state.tokens.tokenList);
   const [tokens, setTokens] = useState<BinanceTokenScreenItem[]>(tokenList);
   const [listLoading, setListLoading] = useState(false);
-
+  const [relativeTime, setRelativeTime] = useState('0m ago');
   useEffect(() => {
     dispatch(
       setPageInfo({
         page: 'token',
         info: {
-          title: t.agent?.token || 'BSC State-Scanner',
+          title: t.agent?.token || 'BEP20 Liquidity Leader',
           description: t.agent?.tokenDesc || 'Live on-chain filtering for the most liquid assets on BNB Chain',
         },
       }),
     );
   }, [t]);
+
+  useEffect(() => {
+    const fetchUpdateTime = async () => {
+      try {
+        const response = await getBinanceUpdateTime();
+        const lastUpdated = response.data?.last_updated;
+        if (lastUpdated) {
+          const diffMs = Date.now() - lastUpdated * 1000;
+          const diffMin = Math.floor(diffMs / 60000);
+          if (diffMin < 1) {
+            setRelativeTime('just now');
+          } else if (diffMin < 60) {
+            setRelativeTime(`${diffMin}m ago`);
+          } else {
+            const diffHour = Math.floor(diffMin / 60);
+            setRelativeTime(`${diffHour}h ago`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch binance update time:', error);
+      }
+    };
+
+    fetchUpdateTime();
+    const interval = setInterval(fetchUpdateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     setTokens(tokenList);
@@ -199,6 +250,12 @@ export const Token = () => {
 
   return (
     <div className="token-container">
+      <div className="mb-2 flex items-center justify-between text-black">
+        <div className="text-[13px] font-bold">{t.agent?.update || 'My Alpha Holding'}</div>
+        <div className="flex items-center gap-2">
+          <img src={time} alt="Time Icon" className="h-[14px] w-[14px] text-[12px]" /> {relativeTime}
+        </div>
+      </div>
       <div className="token-list-box mb-[20px] flex flex-col gap-[14px]">
         {listLoading &&
           Array.from({ length: 4 }).map((_, index) => <TokenCardSkeleton key={`token-skeleton-${index}`} />)}
@@ -208,7 +265,16 @@ export const Token = () => {
             const logo = token.imageUrl;
             const key = token.contractAddress;
 
-            return <TokenCard key={key} name={name} contractAddress={key} price={token.price} logo={logo} />;
+            return (
+              <TokenCard
+                key={key}
+                name={name}
+                contractAddress={key}
+                price={token.price}
+                logo={logo}
+                tokenData={token}
+              />
+            );
           })}
       </div>
     </div>
