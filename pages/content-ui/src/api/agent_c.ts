@@ -776,6 +776,29 @@ export type StreamingResponse =
     }
   | string;
 
+export type BinanceTokenAnalysisStreamingResponse =
+  | {
+      event: 'message' | 'workflow_started' | 'workflow_finished' | 'message_end';
+      answer?: string;
+      data?: {
+        analyse_result?: {
+          output?: {
+            output: string;
+          };
+        };
+        recommend_result?: {
+          output?: {
+            output: string;
+          };
+        };
+        text?: string;
+        content?: string;
+      };
+      text?: string;
+      content?: string;
+    }
+  | string;
+
 // Streaming API functions
 export const analyse_coin_c_streaming = (
   str: string,
@@ -788,7 +811,7 @@ export const analyse_coin_c_streaming = (
   };
 
   return streamingRequest<StreamingResponse>(
-    `${API_BASE_URL}/v1/analyse_coin2`,
+    `${API_BASE_URL}/v1/analyse_coin`,
     {
       method: 'POST',
       cache: 'no-store',
@@ -817,7 +840,7 @@ export const recommend_coin_c_streaming = (
   };
 
   return streamingRequest<StreamingResponse>(
-    `${API_BASE_URL}/v1/recommend_coin2`,
+    `${API_BASE_URL}/v1/recommend_coin`,
     {
       method: 'POST',
       cache: 'no-store',
@@ -846,7 +869,7 @@ export const position_risk_management_streaming = (
   };
 
   return streamingRequest<StreamingResponse>(
-    `${API_BASE_URL}/v1/position_risk_management2`,
+    `${API_BASE_URL}/v1/position_risk_management`,
     {
       method: 'POST',
       cache: 'no-store',
@@ -890,6 +913,31 @@ export const liquidity_check_dify = (str: string, endFun?: () => void, abortCont
   );
 };
 
+// Binance Token Analysis Streaming API
+export const binance_token_analysis_streaming = (
+  input: string,
+  endFun?: () => void,
+  abortController?: AbortController,
+) => {
+  return streamingRequest<BinanceTokenAnalysisStreamingResponse>(
+    `${API_BASE_URL}/v1/binance_token_analysis`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      body: JSON.stringify({ input }),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    },
+    {
+      endFun,
+      abortController,
+      parseMode: 'sse',
+      forceDirect: true,
+    },
+  );
+};
+
 // Spot Price API
 export interface SpotPriceRequest {
   symbol: string;
@@ -903,4 +951,34 @@ export interface SpotPriceResponse extends ApiResponse {
 
 export const get_spot_price = (data: SpotPriceRequest): Promise<SpotPriceResponse> => {
   return service.post<SpotPriceResponse>(`${API_BASE_URL}/v1/getspotprice`, data);
+};
+
+// ============ Binance Active Pools Count ============
+
+export interface BinanceActivePoolsCountResponseData {
+  count: number;
+}
+
+export interface GetBinanceActivePoolsCountResponse extends ApiResponse {
+  data: BinanceActivePoolsCountResponseData;
+}
+
+export const getBinanceActivePoolsCount = (): Promise<GetBinanceActivePoolsCountResponse> => {
+  return service
+    .get(`/v1/binance_active_pools_count`)
+    .then(res => res as unknown as GetBinanceActivePoolsCountResponse);
+};
+
+// ============ Binance Update Time ============
+
+export interface BinanceUpdateTimeResponseData {
+  last_updated: number;
+}
+
+export interface GetBinanceUpdateTimeResponse extends ApiResponse {
+  data: BinanceUpdateTimeResponseData;
+}
+
+export const getBinanceUpdateTime = (): Promise<GetBinanceUpdateTimeResponse> => {
+  return service.get(`/v1/binance_update_time`).then(res => res as unknown as GetBinanceUpdateTimeResponse);
 };
