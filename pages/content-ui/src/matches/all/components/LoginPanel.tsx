@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@src/store';
 import { useEffect, useMemo, useState } from 'react';
 import { user_rewardpoints } from '@src/api/user';
+import { get_llax_balance, type LLAxBalanceData } from '@src/api/agent_c';
 import { useI18n } from '@src/lib/i18n';
 import { syncPoints } from '@src/store/slices/userSlice';
 
@@ -26,21 +27,19 @@ export const LoginPanel = ({ onLogout }: { onLogout?: () => void }) => {
   const smallPeople = chrome.runtime.getURL('content-ui/smallPeople.svg');
   const address = useSelector((state: RootState) => state.user.address);
   const otherInfo = useSelector((state: RootState) => state.user.otherInfo);
-  // const [rewardPoints, setRewardPoints] = useState<number | null>(null)
+  const [llaxBalance, setLlaxBalance] = useState<LLAxBalanceData['balance'] | null>(null);
+
   const dispatch = useDispatch<AppDispatch>();
   useEffect(() => {
     dispatch(syncPoints());
-    // user_rewardpoints()
-    //     .then((response) => {
-    //         if (!isMounted) return
-    //         const points = Number(response?.data?.reward_points ?? 0)
-    //         setRewardPoints(Number.isFinite(points) ? points : 0)
-    //     })
-    //     .catch(() => {
-    //         if (!isMounted) return
-    //         setRewardPoints(null)
-    //     })
-  }, []);
+    get_llax_balance()
+      .then(response => {
+        setLlaxBalance(response.data?.balance ?? null);
+      })
+      .catch(() => {
+        setLlaxBalance(null);
+      });
+  }, [dispatch]);
 
   return (
     <div className="w-[370px]">
@@ -88,22 +87,24 @@ export const LoginPanel = ({ onLogout }: { onLogout?: () => void }) => {
         </div>
 
         <div className="flex gap-[4px]">
-          <div className="h-[52px] w-[55%] rounded-[8px] bg-[#E9FF93] px-2 py-3">
-            <div className="flex h-full items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img src={smallMoney} alt="" />
-                <div className="text-[12px] text-[#666666]">{t.loginPanel?.myPoints || 'My Points'}</div>
-              </div>
-              <div className="font-bold text-black">{points === null ? '0' : points.toLocaleString()}</div>
-            </div>
-          </div>
-          <div className="h-[52px] w-[43%] rounded-[8px] bg-[#F9FFE2] px-2 py-3">
+          <div className="h-[52px] w-[20%] rounded-[8px] bg-[#cf0] px-2 py-3">
             <div className="flex h-full items-center justify-between">
               <div className="flex items-center gap-2">
                 <img src={smallPeople} alt="" />
-                <div className="text-[12px] text-[#666666]">{t.loginPanel?.myInvite || 'My Invite'}</div>
               </div>
               <div className="font-bold text-black">{otherInfo.invite_count || '0'}</div>
+            </div>
+          </div>
+          <div className="h-[52px] flex-1 rounded-[8px] bg-[#E9FF93] px-2 py-3">
+            <div className="flex h-full items-center justify-between">
+              <div className="flex items-center gap-2">
+                <img src={smallMoney} alt="" />
+                <div className="text-[12px] text-[#666666]">LLAx</div>
+              </div>
+              <div className="font-bold text-black">
+                {llaxBalance === null ? '0' : llaxBalance.balance.toLocaleString()}
+              </div>
+              <Button>Claim</Button>
             </div>
           </div>
         </div>

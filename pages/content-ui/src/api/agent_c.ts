@@ -982,3 +982,23 @@ export interface GetBinanceUpdateTimeResponse extends ApiResponse {
 export const getBinanceUpdateTime = (): Promise<GetBinanceUpdateTimeResponse> => {
   return service.get(`/v1/binance_update_time`).then(res => res as unknown as GetBinanceUpdateTimeResponse);
 };
+
+// ============ LLAx Balance ============
+
+export interface LLAxBalanceData {
+  balance: {
+    balance: number;
+    total_earned: number;
+    total_consumed: number;
+  };
+}
+
+export interface LLAxBalanceResponse extends ApiResponse {
+  data: LLAxBalanceData;
+}
+
+export const get_llax_balance = (): Promise<LLAxBalanceResponse> => {
+  return service.get(`/v1/llax/balance`, {
+    cache: 'no-store',
+  });
+};
