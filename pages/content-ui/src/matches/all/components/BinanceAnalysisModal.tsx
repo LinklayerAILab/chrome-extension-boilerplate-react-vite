@@ -8,6 +8,7 @@ import { binance_token_analysis_streaming, type BinanceTokenScreenItem } from '@
 import { syncPoints } from '@src/store/slices/userSlice';
 import { store } from '@src/store';
 import { ChatMessage } from './ChatMessage';
+import { CoinHeader } from './CoinHeader';
 import type { MessageChunk } from './Typewriter';
 
 interface BinanceAnalysisModalProps {
@@ -244,8 +245,15 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
     return null;
   }
 
-  const tokenSymbol = token.tokenSymbol || token.tokenName || 'Token';
-  const logo = token.imageUrl || chrome.runtime.getURL('content-ui/coins/bnb.svg');
+  const headerTitle = (
+    <CoinHeader
+      symbol={token.tokenSymbol}
+      type="SPOT"
+      priceLoop={false}
+      logo={token.imageUrl || chrome.runtime.getURL('content-ui/coins/bnb.svg')}
+      tradingUrl={`https://www.binance.com/zh-CN/alpha/bsc/${token.contractAddress}`}
+    />
+  );
 
   const modalContent = (
     <div className="pointer-events-auto absolute inset-0 z-[10000] flex items-center justify-center">
@@ -259,24 +267,7 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
         role="dialog"
         aria-modal="true"
         className="relative z-[10001] flex max-h-[90vh] w-[92vw] max-w-[400px] flex-col rounded-[12px] bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
-          <img src={logo} alt={tokenSymbol} className="h-7 w-7 rounded-full bg-white" />
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-gray-800">{tokenSymbol.toUpperCase()}</span>
-            <span className="text-[10px] text-gray-400">{t.agent?.analyze ?? 'Analyze'}</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="ml-auto flex h-6 w-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label={tAny?.common?.close ?? 'Close'}>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+        <div>{headerTitle}</div>
 
         {/* Body */}
         <div className="flex-1 overflow-hidden">
