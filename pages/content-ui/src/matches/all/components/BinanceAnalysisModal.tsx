@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@src/store';
 import { useI18n } from '@src/lib/i18n';
-import { message, Button, TextArea } from '@src/ui';
+import { message } from '@src/ui';
 import { binance_token_analysis_streaming, type BinanceTokenScreenItem } from '@src/api/agent_c';
 import { syncPoints } from '@src/store/slices/userSlice';
 import { store } from '@src/store';
@@ -17,20 +17,17 @@ interface BinanceAnalysisModalProps {
   isLogin: boolean;
 }
 
-type ModalStatus = 'input' | 'loading' | 'generating' | 'end';
-
 const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceAnalysisModalProps) => {
   const { t } = useI18n();
   const tAny = t as unknown as Record<string, any>;
   const bot = chrome.runtime.getURL('content-ui/agent/banner.png');
 
-  // Layout box portal target
   const [layoutBox, setLayoutBox] = useState<HTMLElement | null>(null);
 
   useLayoutEffect(() => {
     const findInShadowDOMs = (): HTMLElement | null => {
-      const allElements = Array.from(document.querySelectorAll('*'));
-      for (const el of allElements) {
+      const allElements = document.querySelectorAll('*');
+      for (const el of Array.from(allElements)) {
         const shadowRoot = (el as any).shadowRoot;
         if (shadowRoot) {
           const found = shadowRoot.getElementById('layout-box');
@@ -82,16 +79,14 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
     };
   }, []);
 
-  // State
-  const [status, setStatus] = useState<ModalStatus>('input');
-  const [inputText, setInputText] = useState('');
+  const [status, setStatus] = useState<'init' | 'loading' | 'generating' | 'end'>('init');
   const [loading, setLoading] = useState(false);
   const [messageChunks, setMessageChunks] = useState<MessageChunk[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const streamAbortController = useRef<AbortController | null>(null);
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasStartedRef = useRef(false);
 
-  // Cleanup
   const cleanup = useCallback(() => {
     if (streamAbortController.current) {
       streamAbortController.current.abort();
@@ -103,18 +98,10 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
     }
     setLoading(false);
     setMessageChunks([]);
-    setStatus('input');
+    setStatus('init');
     setIsStreaming(false);
-    setInputText('');
   }, []);
 
-  // Close handler
-  const handleClose = useCallback(() => {
-    cleanup();
-    onClose();
-  }, [cleanup, onClose]);
-
-  // Stop streaming
   const stopCreation = useCallback(() => {
     if (streamAbortController.current) {
       streamAbortController.current.abort();
@@ -123,23 +110,29 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
     setStatus('end');
     setLoading(false);
     setIsStreaming(false);
-  }, []);
+    onClose();
+  }, [onClose]);
 
-  // Start streaming analysis
-  const startAnalysis = useCallback(async () => {
+  const handleClose = useCallback(() => {
+    cleanup();
+    onClose();
+  }, [cleanup, onClose]);
+
+  const startStreaming = useCallback(async () => {
     if (!isLogin) {
       message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
+      onClose();
       return;
     }
 
     const currentPoints = store.getState().user.points;
     if (currentPoints < 10) {
       message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
+      onClose();
       return;
     }
 
-    const query = `${t.agent?.analyze ?? 'Analyze'}\n${JSON.stringify(token)}`;
-    const fullInput = inputText.trim() ? `${query}\n${inputText.trim()}` : query;
+    const fullInput = `${t.agent?.analyze ?? 'Analyze'}\n${JSON.stringify(token)}`;
 
     setStatus('loading');
     setLoading(true);
@@ -222,22 +215,24 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
       setLoading(false);
       setIsStreaming(false);
     }
-  }, [isLogin, token, inputText, cleanup, tAny, t]);
+  }, [isLogin, token, cleanup, tAny, t, onClose]);
 
   const dispatch = useDispatch<AppDispatch>();
-  const handleStart = useCallback(() => {
-    dispatch(syncPoints()).then(() => {
-      setTimeout(() => {
-        startAnalysis();
-      }, 0);
-    });
-  }, [dispatch, startAnalysis]);
-
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      if (!hasStartedRef.current) {
+        hasStartedRef.current = true;
+        dispatch(syncPoints()).then(() => {
+          setTimeout(() => {
+            startStreaming();
+          }, 0);
+        });
+      }
+    } else {
       cleanup();
+      hasStartedRef.current = false;
     }
-  }, [isOpen, cleanup]);
+  }, [isOpen, startStreaming, cleanup, dispatch]);
 
   useEffect(() => {
     return () => {
@@ -285,38 +280,16 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
 
         {/* Body */}
         <div className="flex-1 overflow-hidden">
-          {status === 'input' && (
-            <div className="flex flex-col gap-3 p-4">
-              <TextArea
-                value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                placeholder={tAny?.agent?.inputPlaceholder ?? 'Enter your analysis request...'}
-                rows={3}
-                className="w-full resize-none"
-              />
-              <div className="flex justify-end gap-2">
-                <Button size="small" onClick={handleClose}>
-                  {tAny?.common?.cancel ?? 'Cancel'}
-                </Button>
-                <Button size="small" type="primary" onClick={handleStart} disabled={!inputText.trim()}>
-                  {tAny?.agent?.startAnalysis ?? 'Start Analysis'}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {(status === 'loading' || status === 'generating' || status === 'end') && (
-            <ChatMessage
-              status={status as 'init' | 'loading' | 'generating' | 'end'}
-              stopCreation={stopCreation}
-              isStreaming={isStreaming}
-              tip={tAny?.agent?.analyzing ?? 'Analyzing...'}
-              loading={loading}
-              messages={messageChunks}
-              initNode={<img src={bot} alt="" className="mx-auto h-20" />}
-              className="h-[60vh]"
-            />
-          )}
+          <ChatMessage
+            status={status}
+            stopCreation={stopCreation}
+            isStreaming={isStreaming}
+            tip={tAny?.agent?.analyzing ?? 'Analyzing...'}
+            loading={loading}
+            messages={messageChunks}
+            initNode={<img src={bot} alt="" className="mx-auto h-20" />}
+            className="h-[60vh]"
+          />
         </div>
       </div>
     </div>
