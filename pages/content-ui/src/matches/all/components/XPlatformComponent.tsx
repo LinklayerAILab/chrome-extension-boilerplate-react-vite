@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { store } from '@src/store';
 import type { BinanceTokenScreenItem } from '@src/api/agent_c';
-import { getBinanceTokenScreen } from '@src/api/agent_c';
+import { getBinanceTokenScreen, getBinanceActivePoolsCount, getBinanceUpdateTime } from '@src/api/agent_c';
 import { setSelectedMenuId, setSidePanelOpen } from '@src/store/slices/uiSlice';
 import { setTokenList } from '@src/store/slices/tokenSlice';
 import { StatusIndicator } from './StatusIndicator';
+import inlineCss from '../../../../dist/all/index.css?inline';
+
 // 检测 Twitter/X 平台的主题
 
 const parseRgb = (value: string): { r: number; g: number; b: number; a: number } | null => {
@@ -176,8 +178,21 @@ const greenDark = chrome.runtime.getURL('content-ui/xInject/green-dark.svg');
 const greenLight = chrome.runtime.getURL('content-ui/xInject/green-light.svg');
 const defaultTokenLogo = chrome.runtime.getURL('content-ui/coins/bnb.svg');
 
+// 注入 Tailwind CSS 到宿主页面（XPlatformComponent 不在 Shadow DOM 中）
+const injectTailwindStyles = () => {
+  const tailwindStyleId = 'x-platform-tailwind-styles';
+  if (!document.getElementById(tailwindStyleId)) {
+    const twStyle = document.createElement('style');
+    twStyle.id = tailwindStyleId;
+    twStyle.textContent = inlineCss;
+    document.head.appendChild(twStyle);
+  }
+};
+
 // 注入组件专用样式
 const injectStyles = (lightBgImage: string, darkBgImage: string) => {
+  injectTailwindStyles();
+
   const styleId = 'x-platform-injected-styles';
   const existingStyle = document.getElementById(styleId);
 
@@ -241,7 +256,23 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
     .x-platform-token-card.dark {
       background-color: #2E3A21;
     }
-
+    .x-platform-token-chart-img {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 8px;
+    
+    }
+    .x-platform-token-chart-img.dark{
+         background-color: #F8FFDC;
+      border: 1px solid #C4F402;
+      border-radius: 8px;
+      }
+      .x-platform-token-chart-img.light{
+            background-color: #F2F2F2;
+      border: 1px solid #F2F2F2;
+      border-radius: 8px;
+}
     .x-platform-token-header {
       display: flex;
       align-items: center;
@@ -267,15 +298,33 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
       background-position: center;
       background-repeat: no-repeat;
       background-size: contain;
+      display: flex;
+      gap: 8px;
     }
 
-    .x-platform-token-chart.light {
+    .x-platform-token-chart .x-card-box.light {
+      background-color: #F2F2F2;
+      border: 1px solid #F2F2F2;
+      border-radius: 8px;
+      height: 53px;
+      padding: 4px 0;
+    }
+
+    .x-platform-token-chart .x-card-box.dark {
+      background-color: #F8FFDC;
+      border: 1px solid #C4F402;
+      border-radius: 8px;
+            height: 53px;
+                 padding: 4px 0;
+    }
+
+    /* .x-platform-token-chart.light {
       background-image: url('${lightBgImage}');
     }
 
     .x-platform-token-chart.dark {
       background-image: url('${darkBgImage}');
-    }
+    } */
 
     .x-platform-list-card {
         height: 68px;
@@ -420,21 +469,7 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
      align-items: center;
      padding: 12px;
    }
-     .x-platform-token-chart-top {
-     display: flex;
-     justify-content: space-between;
-     gap:60px;
-     margin-top: 4px;
-
-     }
-     .x-platform-token-chart-bottom{
-      display: flex;
-     justify-content: space-between;
-     margin-top: 8px;
-      gap:60px;
-      margin-top: 10px;
-     }
-      .x-platform-token-header-logo{
+     .x-platform-token-header-logo{
       display: flex;
       align-items: center;
       justify-content: center;
@@ -458,28 +493,6 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
       .x-platform-token-header-logo.dark{
         text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
         color: black;
-      }
-
-     .x-platform-token-chart-top>div, .x-platform-token-chart-bottom>div {
-      flex: 1;
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      
-     }
-      .x-platform-token-chart-top-label,x-platform-token-chart-bottom-label, .x-platform-token-chart-bottom-value,.x-platform-token-chart-top-value {
-        text-align: center;
-      }
-      .x-platform-token-chart-top-label,.x-platform-token-chart-bottom-label{
-        font-size: 10px;
-
-      }
-        .x-platform-token-chart-top-value,.x-platform-token-chart-bottom-value{
-        font-size: 13px;
-        font-weight: bold;
-
       }
 
   @keyframes injectStatusBlinkLight {
@@ -528,6 +541,8 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
 export const XPlatformComponent = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>(getSystemTheme);
   const [tokens, setTokens] = useState<BinanceTokenScreenItem[]>(() => store.getState().tokens.tokenList);
+  const [activePoolCount, setActivePoolCount] = useState<number>(0);
+  const [relativeTime, setRelativeTime] = useState('3m ago');
 
   useEffect(() => {
     const updateTheme = () => setTheme(getSystemTheme());
@@ -571,6 +586,43 @@ export const XPlatformComponent = () => {
   }, []);
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const poolsRes = await getBinanceActivePoolsCount();
+        const count = poolsRes.data?.count;
+        if (typeof count === 'number') {
+          setActivePoolCount(count);
+        }
+      } catch (error) {
+        console.error('Failed to fetch active pools count:', error);
+      }
+
+      try {
+        const timeRes = await getBinanceUpdateTime();
+        const lastUpdated = timeRes.data?.last_updated;
+        if (lastUpdated) {
+          const diffMs = Date.now() - lastUpdated * 1000;
+          const diffMin = Math.floor(diffMs / 60000);
+          if (diffMin < 1) {
+            setRelativeTime('just now');
+          } else if (diffMin < 60) {
+            setRelativeTime(`${diffMin}m ago`);
+          } else {
+            const diffHour = Math.floor(diffMin / 60);
+            setRelativeTime(`${diffHour}h ago`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch binance update time:', error);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     let isActive = true;
     const fetchTokens = async () => {
       try {
@@ -611,42 +663,43 @@ export const XPlatformComponent = () => {
             <div className="x-platform-token-header">
               <div className={`x-platform-token-header-logo ${themeClass}`}>
                 <img src={chrome.runtime.getURL('content-ui/xInject/bnb.svg')} alt="BNB" />
-                <span>BSC Chain Pulse</span>
+                <span>BNB Chain Pulse</span>
               </div>
             </div>
             <div className={`x-platform-token-chart-container ${themeClass}`}>
               <div className={`x-platform-token-chart relative ${themeClass}`}>
-                {theme === 'light' ? (
-                  <img
-                    src={greenLight}
-                    alt="Green Light"
-                    style={{ position: 'absolute', width: 60, height: 76, left: '50%', marginLeft: -32, top: '20px' }}
-                  />
-                ) : (
-                  <img
-                    src={greenDark}
-                    alt="Green Dark"
-                    style={{ position: 'absolute', width: 60, height: 76, left: '50%', marginLeft: -32, top: '20px' }}
-                  />
-                )}
-                <div className="x-platform-token-chart-top">
-                  <div>
-                    <div className="x-platform-token-chart-top-label">Healthy Token</div>
-                    <div className="x-platform-token-chart-top-value">{tokens.length}</div>
-                  </div>
-                  <div>
-                    <div className="x-platform-token-chart-top-label">Active Pools</div>
-                    <div className="x-platform-token-chart-top-value">-</div>
-                  </div>
+                <div className={`x-platform-token-chart-img ${themeClass}`}>
+                  <img src={greenLight} alt="Green Light" style={{ width: 54, height: 90 }} />
                 </div>
-                <div className="x-platform-token-chart-bottom">
-                  <div>
-                    <div className="x-platform-token-chart-bottom-label">Total Liquidity</div>
-                    <div className="x-platform-token-chart-bottom-value">-</div>
-                  </div>
-                  <div>
-                    <div className="x-platform-token-chart-bottom-label">Avg Exit Cost</div>
-                    <div className="x-platform-token-chart-bottom-value">-</div>
+                <div className="flex flex-1 items-end justify-end gap-[1vh]">
+                  {/* <div className={`flex items-center justify-center rounded-[8px] p-[1vh] ${themeClass === 'light' ? 'bg-[#F8FFDC]' : 'bg-[#2E3A21]'}`}>
+                    <img
+                      src={theme === 'light' ? topLight : topDark}
+                      alt="top"
+                      className="h-[14vh] w-[8vh]"
+                      style={{ color: 'transparent', width: 45, height: 50 }}
+                    />
+                  </div> */}
+                  <div className="flex w-full flex-wrap gap-2 text-black">
+                    <div className="flex w-full gap-2">
+                      <div
+                        className={`x-card-box flex h-[50px] w-[calc(50%-0.5vh)] flex-1 flex-col items-center justify-center rounded-[8px] px-[14px] py-[10px] ${themeClass}`}>
+                        <div className="whitespace-nowrap text-[12px]">Active Pools</div>
+                        <div className="text-center text-[13px] font-bold">{activePoolCount}</div>
+                      </div>
+                      <div
+                        className={`x-card-box flex h-[50px] w-[calc(50%-0.5vh)] flex-1 flex-col items-center justify-center rounded-[8px] px-[14px] py-[10px] ${themeClass}`}>
+                        <div className="whitespace-nowrap text-[12px]">Healthy Tokens</div>
+                        <div className="text-center text-[13px] font-bold">{tokens.length}</div>
+                      </div>
+                    </div>
+                    <div className="w-full">
+                      <div
+                        className={`x-card-box py-[10px]flex h-[50px] w-full flex-col items-center justify-center rounded-[8px] px-[14px] ${themeClass}`}>
+                        <div className="whitespace-nowrap text-center text-[12px]">Liquidity Status</div>
+                        <div className="text-center text-[13px] font-bold">-</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -659,9 +712,9 @@ export const XPlatformComponent = () => {
           <div className={`x-platform-list-card ${themeClass}`}>
             <div>
               <div className={`x-platform-list-card-title ${themeClass}`} style={{ fontSize: 16 }}>
-                BSC Blue-Chips
+                BEP20 Liquidity Leader
               </div>
-              <div className={`x-platform-list-card-time`}>update 3m ago</div>
+              <div className={`x-platform-list-card-time`}>update {relativeTime}</div>
             </div>
             <div>
               <img src={listTop} alt="List Top" />

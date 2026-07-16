@@ -3,12 +3,15 @@ import { getBinanceTokenPrice, getBinanceTokenScreen, getBinanceUpdateTime } fro
 import { useI18n } from '@src/lib/i18n';
 import { setPageInfo } from '@src/store/slices/pageInfoSlice';
 import { setTokenList } from '@src/store/slices/tokenSlice';
-import { Button, Skeleton } from '@src/ui';
+import { syncPoints } from '@src/store/slices/userSlice';
+import { Button, Skeleton, message } from '@src/ui';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { StatusIndicator } from './StatusIndicator';
 import BinanceAnalysisModal from './BinanceAnalysisModal';
 import type { RootState } from '@src/store';
+import { store } from '@src/store';
+import type { AppDispatch } from '@src/store';
 
 const topLight = chrome.runtime.getURL('content-ui/xInject/top-light.svg');
 const priceIcon = chrome.runtime.getURL('content-ui/token/price.svg');
@@ -25,6 +28,8 @@ interface TokenCardProps {
 
 const TokenCard = ({ name, contractAddress, price, logo, tokenData, isLogin }: TokenCardProps) => {
   const { t } = useI18n();
+  const dispatch = useDispatch<AppDispatch>();
+  const tAny = t as unknown as Record<string, any>;
 
   const optimal = t.common?.optimal || 'Optimal';
   const lpDepth = t.common?.lpDepth || 'LP Depth';
@@ -34,7 +39,17 @@ const TokenCard = ({ name, contractAddress, price, logo, tokenData, isLogin }: T
 
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
 
-  const handleAgentClick = () => {
+  const handleAgentClick = async () => {
+    if (!isLogin) {
+      message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
+      return;
+    }
+    await dispatch(syncPoints());
+    const currentPoints = store.getState().user.points;
+    if (currentPoints < 10) {
+      message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
+      return;
+    }
     setIsAnalysisOpen(true);
   };
 

@@ -87,27 +87,6 @@ export const AddApi = () => {
       return;
     }
 
-    // 校验必填字段
-    if (!selectedExchange) {
-      message.error(t.apiForm?.cexNameRequired || 'CEX Name is required');
-      return;
-    }
-
-    if (!formData.apiKey.trim()) {
-      message.error(t.apiForm?.apiKeyRequired || 'API Key is required');
-      return;
-    }
-
-    if (!formData.secretKey.trim()) {
-      message.error(t.apiForm?.secretKeyRequired || 'Secret Key is required');
-      return;
-    }
-
-    if (needsPassphrase && !formData.passphrase.trim()) {
-      message.error(t.apiForm?.passphraseRequired || 'Passphrase is required');
-      return;
-    }
-
     try {
       setLoading(true);
       await add_userapikey({
@@ -125,8 +104,11 @@ export const AddApi = () => {
         passphrase: '',
       });
     } catch (error) {
-      // Error is already handled by the service interceptor
-      console.error('Failed to submit API keys:', error);
+      if (error instanceof Error) {
+        message.error(error.message);
+      } else {
+        message.error(t.apiForm?.submitFailed || 'Failed to submit API keys');
+      }
     } finally {
       setLoading(false);
     }

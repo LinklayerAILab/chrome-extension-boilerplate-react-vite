@@ -133,7 +133,7 @@ const BinanceAnalysisModal = memo(({ isOpen, onClose, token, isLogin }: BinanceA
       return;
     }
 
-    const fullInput = `${t.agent?.analyze ?? 'Analyze'}\n${JSON.stringify(token)}`;
+    const fullInput = `${t.agent?.analyze ?? 'Analyze'} ${JSON.stringify(token)}`;
 
     setStatus('loading');
     setLoading(true);

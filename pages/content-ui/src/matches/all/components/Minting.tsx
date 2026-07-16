@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@src/store';
@@ -13,7 +13,6 @@ const question = chrome.runtime.getURL('content-ui/minting/question.svg');
 const dakaIcon = chrome.runtime.getURL('content-ui/platform/daka.svg');
 const successIcon = chrome.runtime.getURL('content-ui/platform/successIcon.svg');
 const clockIcon = chrome.runtime.getURL('content-ui/platform/clock.svg');
-const timeoutIcon = chrome.runtime.getURL('content-ui/platform/timeout.svg');
 export interface LiquidationCalculatedRequest {
   cex_name: string;
 }
@@ -136,71 +135,41 @@ const ReceiveBtn = ({
 };
 
 const ReceiveSlide = ({ data }: { data: ClaimInfoItem }) => {
-  const diff = 2592000000;
-  const now = Date.now();
-  const periodEnd = normalizeTimestamp(data.period_end);
-  const claimTime = normalizeTimestamp(data.claim_time);
+  const isPlaceholder = !data.id;
+  const { t } = useI18n();
 
-  const handleType = () => {
-    if (data.period_start === 0) {
-      return 0;
-    }
-    if (data.claim_flag) {
-      return 1;
-    }
-    if (now - periodEnd > diff) {
-      return 2;
-    }
-    return 3;
+  const getChannelLabel = () => {
+    if (data.channel_id === 2) return t.home?.oneTime || 'One-Time';
+    if (data.channel_id === 3) return t.home?.monthly || 'Monthly';
+    return data.channel_type || '';
   };
-
-  const handleClass = () => {
-    if (data.claim_flag || handleType() === 0) {
-      return 'bg-[#cf0] border-b-[#fff]';
-    }
-    if (now - periodEnd > diff) {
-      return 'bg-[#CECECE] border-b-white lg:border-b-black';
-    }
-    return 'bg-[#cf0] border-b-[#fff]';
-  };
-
-  const handleImg = () => {
-    if (handleType() === 0) {
-      return clockIcon;
-    }
-    if (data.claim_flag) {
-      return successIcon;
-    }
-    if (now - periodEnd > diff) {
-      return timeoutIcon;
-    }
-    return clockIcon;
-  };
-
-  const dateText = handleType() === 0 ? '---' : handleType() === 1 ? formatDate(claimTime) : formatDate(periodEnd);
 
   return (
-    <div className="h-[140px] rounded-[8px] bg-white lg:h-[16vh] lg:bg-[#ebebeb]">
+    <div className="h-[140px] rounded-[8px] bg-white lg:h-[14vh] lg:bg-[#ebebeb]">
       <div
-        className={`${handleClass()} border-b-solid flex h-[50px] items-center justify-center border-b-[1px] lg:h-[5vh]`}>
+        className={`border-b-solid flex h-[50px] items-center justify-center border-b-[1px] border-b-[#fff] bg-[#cf0] lg:h-[5vh]`}>
         <span className="flex items-center gap-[6px] font-bold">
           <img src={dakaIcon} alt="daka" className="h-[16px] w-[16px]" />
-          <span>{dateText}</span>
+          <span className="text-[14px]">{isPlaceholder ? '---' : formatDate(new Date(data.created_at).getTime())}</span>
         </span>
       </div>
       <div>
-        <div className="relative flex h-[38px] items-center justify-center py-[10px] lg:h-[6vh] lg:py-[1vh]">
+        <div
+          className={`relative flex items-center justify-center ${
+            data.channel_id ? 'h-[38px] lg:h-[3.5vh]' : 'h-[52px] py-1 lg:h-[5vh]'
+          }`}>
           <img
-            src={handleImg()}
+            src={isPlaceholder ? clockIcon : successIcon}
             alt="status"
-            className={`h-[28px] lg:h-[4vh] ${
-              handleType() === 2 ? 'absolute top-[-10px] h-[48px] w-[48px] lg:top-[-1.7vh] lg:h-[8vh] lg:w-[8vh]' : ''
-            }`}
+            className={`${data.channel_id ? 'h-[28px] lg:h-[2vh]' : 'h-[28px] lg:h-[3vh]'}`}
           />
         </div>
-        <div className="flex items-center justify-center font-bold">
-          <div>
-            <span>{data.claim_amount || '--'}</span> <span>LLAx</span>
+        <div className="flex items-center justify-center text-[12px] font-bold">
+          <div className="text-center">
+            {data.channel_type && <div>{isPlaceholder ? '--' : getChannelLabel()}</div>}
+            <div>
+              <span className="text-[12px]">{isPlaceholder ? '--' : data.amount}</span> <span>LLAx</span>
+            </div>
           </div>
         </div>
       </div>
@@ -217,17 +186,19 @@ export const Minting = () => {
   usePageInfoUpdate('earn', locale);
   const [calculated, setCalculated] = useState<LiquidationCalculatedResponse>();
   const [undue, setUndue] = useState<LiquidationCalculatedResponse>();
-  const initClaimList: ClaimInfoItem[] = useMemo(
-    () =>
-      Array.from({ length: 8 }).map(() => ({
-        claim_flag: false,
-        period_start: 0,
-        period_end: 0,
-        claim_time: 0,
-        claim_amount: 0,
-      })),
-    [],
-  );
+  const initClaimList: ClaimInfoItem[] = Array.from({ length: 8 }, () => ({
+    id: 0,
+    user_id: '',
+    channel_id: 0,
+    channel_type: '',
+    reference_id: '',
+    amount: 0,
+    before_balance: 0,
+    after_balance: 0,
+    pool_before: 0,
+    pool_after: 0,
+    created_at: '',
+  }));
   const [claimInfo, setClaimInfo] = useState<ClaimInfoItem[]>([...initClaimList]);
   const [, setPositionSymbols] = useState<PositionSymbolsItem[]>([]);
 
@@ -249,13 +220,10 @@ export const Minting = () => {
     }
 
     const params = { cex_name: selectCex.toLowerCase() };
-    get_claim_info(params)
+    get_claim_info({ cex_name: selectCex.toLowerCase(), channel_ids: [2, 3] })
       .then(res => {
-        if (!res.data.claim_info || res.data.claim_info.length === 0) {
-          setClaimInfo([...initClaimList]);
-          return;
-        }
-        setClaimInfo(res.data.claim_info);
+        const records = res.data?.records ?? [];
+        setClaimInfo(records.length > 0 ? records : [...initClaimList]);
       })
       .catch(() => {
         setClaimInfo([...initClaimList]);
@@ -280,7 +248,7 @@ export const Minting = () => {
     return () => {
       window.clearInterval(calculatedInterval);
     };
-  }, [selectCex, isLogin, fetchLiquidationData, initClaimList]);
+  }, [selectCex, isLogin, fetchLiquidationData]);
 
   const countdown = useCountdown(undue?.data?.period_end);
 
@@ -299,7 +267,7 @@ export const Minting = () => {
             bg="bg-[#EBFF99]"
             title={t.home?.retroactiveBonus || 'Retroactive Bonus'}
             desc={t.home?.retroactiveBonusDesc || 'Claim your retroactive bonus'}>
-            <div className="flex flex-col gap-[6px] p-[14px] lg:gap-[1vh] lg:p-0">
+            <div className="flex flex-col gap-[6px]">
               <LabelAndVal
                 label={t.home?.ready || 'Ready'}
                 value={t.home?.claimAllBonuses || 'Claim All Bonuses at Once'}
@@ -313,10 +281,6 @@ export const Minting = () => {
                 value={`${calculated?.data?.loss_count || '-'} ${t.home?.times || 'times'}`}
               />
               <LabelAndVal label={t.home?.bonus || 'Bonus'} value={<span className="text-shadow-white">- LLAx</span>} />
-
-              <div className="absolute right-[20px] top-[22px]">
-                <ReceiveBtn disabled>{t.home?.received || 'Received'}</ReceiveBtn>
-              </div>
             </div>
           </ReceivedCard>
 
@@ -324,7 +288,7 @@ export const Minting = () => {
             bg="bg-[#C4BEFF]"
             title={t.home?.recurringRewards || 'Recurring Rewards'}
             desc={t.home?.recurringRewardsDesc || 'Claim your recurring rewards'}>
-            <div className="flex flex-col gap-[6px] p-[14px] lg:gap-[1vh] lg:p-0">
+            <div className="flex flex-col gap-[6px]">
               <LabelAndVal
                 label={t.home?.countdown || 'Countdown'}
                 value={
@@ -346,15 +310,11 @@ export const Minting = () => {
                 label={t.home?.rewards || 'Rewards'}
                 value={<span className="text-shadow-white">- LLAx</span>}
               />
-
-              <div className="absolute right-[20px] top-[22px]">
-                <ReceiveBtn>{t.home?.claim || 'Claim'}</ReceiveBtn>
-              </div>
             </div>
           </ReceivedCard>
         </div>
 
-        <div className="relative mt-[20px] h-[220px] w-full rounded-[8px] lg:mt-[2vh] lg:bg-[#fff]">
+        <div className="mt-[20px] w-full lg:mt-[2vh]">
           <style>{`
             #date-swiper::-webkit-scrollbar {
               height: 4px;
@@ -377,7 +337,7 @@ export const Minting = () => {
           <div className="h-[150px] w-full lg:h-[18vh]">
             <div
               id="date-swiper"
-              className="flex h-full gap-[10px] overflow-x-auto overflow-y-hidden scroll-smooth lg:gap-[14px]"
+              className="flex h-[16vh] gap-[10px] overflow-x-auto overflow-y-hidden scroll-smooth lg:gap-[14px]"
               style={{
                 scrollbarWidth: 'thin',
                 scrollbarColor: '#cf0 #eee',
@@ -385,7 +345,7 @@ export const Minting = () => {
               {claimInfo.map((item, idx) => (
                 <div
                   key={idx}
-                  className="w-[44%] flex-shrink-0 cursor-pointer overflow-hidden rounded-[4px] lg:w-[200px]">
+                  className="mb-[1vh] h-[15vh] min-w-[200px] max-w-[200px] flex-shrink-0 cursor-pointer overflow-hidden rounded-[4px]">
                   <ReceiveSlide data={item} />
                 </div>
               ))}

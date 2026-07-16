@@ -1,9 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Button, Skeleton } from '@src/ui';
+import { useDispatch } from 'react-redux';
+import { Button, Skeleton, message } from '@src/ui';
 import { useI18n } from '@src/lib/i18n';
 import StreamingModal from './StreamingModal';
 import { CoinHeader } from './CoinHeader';
 import { StatusIndicator } from './StatusIndicator';
+import { syncPoints } from '@src/store/slices/userSlice';
+const binanceIcon = chrome.runtime.getURL('content-ui/platforms/binance.svg');
+import { store } from '@src/store';
+import type { AppDispatch } from '@src/store';
 
 interface AlphaCardProps {
   title: string;
@@ -22,7 +27,7 @@ interface AlphaCardProps {
 export const AlphaCard = ({
   title = 'Token Name',
   price = '--',
-  depth = '--',
+  depth = '0',
   icon = '',
   statusColor,
   statusLoading = false,
@@ -32,7 +37,9 @@ export const AlphaCard = ({
   isLogin,
 }: AlphaCardProps) => {
   const { t } = useI18n();
+  const dispatch = useDispatch<AppDispatch>();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const tAny = t as unknown as Record<string, any>;
 
   const zichan = chrome.runtime.getURL('content-ui/alpha/zichan.svg');
   const rise = chrome.runtime.getURL('content-ui/alpha/rise.svg');
@@ -65,7 +72,13 @@ export const AlphaCard = ({
     return undefined;
   };
 
-  const handleAgentClick = () => {
+  const handleAgentClick = async () => {
+    await dispatch(syncPoints());
+    const currentPoints = store.getState().user.points;
+    if (currentPoints < 5) {
+      message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
+      return;
+    }
     setIsModalOpen(true);
   };
 
@@ -96,16 +109,19 @@ export const AlphaCard = ({
       <div className="alpha-card-content flex flex-1 flex-col gap-2">
         <div className="flex items-center justify-between rounded-[4px] bg-[#f3f3f3] px-4 py-2">
           <div className="text-[12px]">{title}</div>
-          <div>--</div>
+          <div className="flex items-center gap-1 text-[12px]">
+            <img src={binanceIcon} alt="" className="h-[18px] w-[18px]"></img>
+            Alpha
+          </div>
         </div>
-        <div className="flex items-center justify-between rounded-[4px] bg-[#f3f3f3] px-4 py-2">
+        {/* <div className="flex items-center justify-between rounded-[4px] bg-[#f3f3f3] px-4 py-2">
           <div className="text-[12px]">{t.common?.price || 'Price'}</div>
           <div className="flex items-center gap-1">
             <img src={zichan} alt=""></img>
 
             {priceLoading ? <Skeleton.Text className="w-16" /> : <span>{price}</span>}
           </div>
-        </div>
+        </div> */}
         <div className="flex items-center justify-between rounded-[4px] bg-[#f3f3f3] px-4 py-2">
           <div className="text-[12px]">{t.common?.lpDepth || 'LP depth'}</div>
           <div

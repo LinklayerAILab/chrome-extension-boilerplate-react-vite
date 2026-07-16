@@ -2,10 +2,12 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@src/store';
 import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '@src/lib/i18n';
-import { Button } from '@src/ui';
+import { Button, message } from '@src/ui';
 import { query_tasks } from '@src/api/agent_c';
 import type { QueryTasksItem, QueryTasksParams, QueryTasksResponse, QueryTasksType } from '@src/api/agent_c';
 import { usePageInfoUpdate } from '@src/lib/hooks/usePageInfoUpdate';
+import { getPayConfig, switchBscChain, getTokenBalance, executeTransfer } from '../lib/payment';
+import { parseUnits } from 'viem';
 const bookIcon = chrome.runtime.getURL('content-ui/points/book.svg');
 const percent12 = chrome.runtime.getURL('content-ui/points/12percent.svg');
 const percent20 = chrome.runtime.getURL('content-ui/points/20percent.svg');
@@ -23,6 +25,13 @@ type CoinListItem = {
   icon: string;
   disabled: boolean;
 };
+
+interface PointsProps {
+  walletConnected?: boolean;
+  walletAddress?: string;
+  providerId?: string;
+  walletChainId?: string;
+}
 
 // 日期格式化函数
 const formatDate = (timestamp: number, format: string = 'MM/DD HH:mm') => {
@@ -68,13 +77,16 @@ const getTypeKey = (
   }
 };
 
-export const Points = () => {
+export const Points = ({
+  walletConnected = false,
+  walletAddress = '',
+  providerId = '',
+  walletChainId = '',
+}: PointsProps) => {
   const { t, locale } = useI18n();
   usePageInfoUpdate('points', locale);
-  // const points = useSelector((state: RootState) => state.user.points);
-  // const pointsLoading = useSelector((state: RootState) => state.user.pointsLoading);
-  // const otherInfo = useSelector((state: RootState) => state.user.otherInfo);
   const isLogin = useSelector((state: RootState) => state.user.isLogin);
+  const isDev = process.env.CLI_CEB_DEV === 'true';
 
   // 充值选项列表
   const [list, setList] = useState<ListItem[]>([
@@ -82,7 +94,7 @@ export const Points = () => {
       value: 1,
       select: true,
       money: '9.9',
-      count: 1200,
+      count: 990,
     },
     {
       value: 2,
@@ -112,7 +124,7 @@ export const Points = () => {
       value: 'usdc',
       select: false,
       icon: chrome.runtime.getURL('content-ui/points/usdc.svg'),
-      disabled: true,
+      disabled: false,
     },
   ]);
 
@@ -124,15 +136,45 @@ export const Points = () => {
   });
   const [recordsLoading, setRecordsLoading] = useState(true);
 
+  // 支付状态
+  const [payLoading, setPayLoading] = useState(false);
+
+  // 等待确认提示（使用 message.loading）
+  const waitingMsgRef = useRef<(() => void) | null>(null);
+  const previousRecordsCountRef = useRef(0); // 交易前记录数
+  const pollingActiveRef = useRef(false); // 轮询是否活跃
+  const confirmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // 获取积分记录列表
   const handleGetList = async () => {
     try {
       const res = await query_tasks(params.current);
       // service 拦截器返回 response.data，所以 res.data 是任务列表数据
-      // 使用类型守卫和类型断言
       const data = res.data as { Res?: QueryTasksItem[]; Total?: number } | null;
       if (data?.Res) {
-        setRecords(data.Res);
+        const newRecords = data.Res;
+        setRecords(newRecords);
+
+        // 如果正在等待确认，且记录数有变化，说明交易已确认
+        if (
+          waitingMsgRef.current &&
+          pollingActiveRef.current &&
+          newRecords.length !== previousRecordsCountRef.current
+        ) {
+          pollingActiveRef.current = false;
+          if (confirmIntervalRef.current) {
+            clearInterval(confirmIntervalRef.current);
+            confirmIntervalRef.current = null;
+          }
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          waitingMsgRef.current();
+          waitingMsgRef.current = null;
+          message.success('Transaction confirmed');
+        }
       } else {
         setRecords([]);
       }
@@ -165,6 +207,157 @@ export const Points = () => {
         select: coin.value === item.value,
       })),
     );
+  };
+
+  // 支付处理
+  const handlePay = async () => {
+    const selectedItem = list.find(item => item.select);
+    if (!selectedItem) {
+      message.warning(t.common?.select ?? 'Please select a package');
+      return;
+    }
+
+    // 如果 props 中没有钱包状态，尝试从 storage 读取作为兜底
+    let effectiveWalletConnected = walletConnected;
+    let effectiveWalletAddress = walletAddress;
+    let effectiveProviderId = providerId;
+    let effectiveWalletChainId = walletChainId;
+
+    if (!walletConnected || !walletAddress) {
+      try {
+        // 尝试通过 background script 获取当前账户
+        const accounts = await chrome.runtime.sendMessage({ type: 'WEB3_REQUEST', method: 'eth_accounts', args: [] });
+        if (accounts?.result && accounts.result.length > 0) {
+          effectiveWalletConnected = true;
+          effectiveWalletAddress = accounts.result[0];
+          // 获取 chainId 和 providerId
+          const chainIdResult = await chrome.runtime.sendMessage({
+            type: 'WEB3_REQUEST',
+            method: 'eth_chainId',
+            args: [],
+          });
+          effectiveWalletChainId = chainIdResult?.result || walletChainId;
+          const providerIdResult = await new Promise<any>((resolve, reject) => {
+            chrome.runtime.sendMessage({ type: 'GET_PROVIDER_ID' }, resolve);
+          });
+          effectiveProviderId = providerIdResult?.result || providerId;
+          console.log('[Points] Recovered wallet state from storage:', {
+            effectiveWalletConnected,
+            effectiveWalletAddress,
+            effectiveProviderId,
+            effectiveWalletChainId,
+          });
+        }
+      } catch (error) {
+        console.warn('[Points] Failed to recover wallet state:', error);
+      }
+    }
+
+    if (!effectiveWalletConnected || !effectiveWalletAddress) {
+      message.error(t.loginPanel?.connectFirst ?? 'Please connect your wallet first');
+      return;
+    }
+
+    const selectedCoin = coinList.find(item => item.select);
+    if (!selectedCoin) {
+      message.warning(t.common?.select ?? 'Please select a payment method');
+      return;
+    }
+
+    setPayLoading(true);
+
+    try {
+      const config = getPayConfig(isDev);
+      const tokenConfig = config.tokens[selectedCoin.value as 'usdt' | 'usdc'];
+      if (!tokenConfig) {
+        message.error('Unsupported payment method');
+        return;
+      }
+
+      // 1. 先切换链，确保在正确链上查询余额
+      const currentChainId = effectiveWalletChainId?.startsWith('0x')
+        ? parseInt(effectiveWalletChainId, 16)
+        : parseInt(effectiveWalletChainId, 10);
+      if (currentChainId !== config.chainId) {
+        await switchBscChain(config.chainId, effectiveProviderId);
+        // 等待链切换完成
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // 2. 检查余额
+      const requiredAmount = parseUnits(selectedItem.money, tokenConfig.decimal);
+      let balance: bigint;
+      try {
+        balance = await getTokenBalance(tokenConfig.address, effectiveWalletAddress, effectiveProviderId);
+      } catch (error: any) {
+        console.error('[Points] getTokenBalance failed:', error);
+        const errorMsg = error?.message ?? 'Unknown error';
+        message.error(`Failed to query ${tokenConfig.label} balance: ${errorMsg}`);
+        return;
+      }
+
+      if (balance < requiredAmount) {
+        const balanceStr = (Number(balance) / 10 ** tokenConfig.decimal).toFixed(2);
+        message.error(
+          `${t.common?.insufficientBalance ?? 'Insufficient balance'}: ${balanceStr} ${tokenConfig.label}, need ${selectedItem.money} ${tokenConfig.label}`,
+        );
+        return;
+      }
+
+      // 3. 执行转账
+      const txHash = await executeTransfer(
+        tokenConfig.address,
+        config.payeeAddress,
+        selectedItem.money,
+        tokenConfig.decimal,
+        effectiveWalletAddress,
+        effectiveProviderId,
+      );
+
+      message.success(t.common?.transactionSubmitted ?? 'Transaction submitted');
+
+      // 记录当前记录数，用于确认检测（使用实际 records 长度而不是 ref）
+      previousRecordsCountRef.current = records.length;
+
+      // 显示等待确认的 loading 弹层（设置最大等待时间 60 秒）
+      waitingMsgRef.current = message.loading(
+        t.myPoints?.waitingConfirmation ?? 'Waiting for chain confirmation...',
+        60,
+      );
+
+      // 启动轮询标志
+      pollingActiveRef.current = true;
+
+      // 每2秒轮询一次，确认检测在 handleGetList 内部完成
+      confirmIntervalRef.current = window.setInterval(() => {
+        if (!pollingActiveRef.current) {
+          if (confirmIntervalRef.current) {
+            clearInterval(confirmIntervalRef.current);
+            confirmIntervalRef.current = null;
+          }
+          return;
+        }
+        handleGetList();
+      }, 2000);
+
+      // 超时自动关闭（60秒，与 message.loading 的 duration 一致）
+      timeoutRef.current = window.setTimeout(() => {
+        if (waitingMsgRef.current) {
+          waitingMsgRef.current();
+          waitingMsgRef.current = null;
+        }
+        pollingActiveRef.current = false;
+        if (confirmIntervalRef.current) {
+          clearInterval(confirmIntervalRef.current);
+          confirmIntervalRef.current = null;
+        }
+        timeoutRef.current = null;
+      }, 60000);
+    } catch (error: any) {
+      message.error(error.message ?? t.common?.transactionFailed ?? 'Transaction failed');
+    } finally {
+      setPayLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -265,7 +458,13 @@ export const Points = () => {
 
           {/* 充值按钮 */}
           <div className="mt-[2vh] flex cursor-pointer select-none items-center justify-center rounded-[5px]">
-            <Button size="small" className="font-bold" style={{ background: '#cf0' }} block>
+            <Button
+              size="small"
+              className="font-bold"
+              style={{ background: '#cf0' }}
+              block
+              loading={payLoading}
+              onClick={handlePay}>
               {t.myPoints?.recharge || 'Recharge'}
             </Button>
           </div>

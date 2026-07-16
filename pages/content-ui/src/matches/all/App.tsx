@@ -36,12 +36,16 @@ import { SiweMessage } from 'siwe';
 import { getAddress } from 'viem';
 import { getSiweNonce, verifySiweMessage } from '@src/api/user';
 import { get_user_info } from '@src/api/agent_c';
+import { autoConfirmPendingClaims } from './lib/claimLlax';
 import { API_BASE_URL } from '@src/api/config';
 import { ACCESS_TOKEN_KEY, ADDRESS_KEY, INVITE_CODE_KEY } from '@src/lib/storageKeys';
 import { useSelector } from 'react-redux';
 import { selectPageInfo } from '@src/store/slices/pageInfoSlice';
 import { user_rewardpoints } from '@src/api/user';
 import { usePageInfoSync } from '@src/lib/hooks/usePageInfoSync';
+
+const envValues = (process.env as Record<string, string | undefined>) ?? {};
+const IS_DEV = envValues.CLI_CEB_DEV === 'true';
 
 // ⚠️ 白名单配置 - 只有这些域名才会注入 Content Script UI
 // 格式：精确匹配域名或通配符 *.example.com
@@ -102,6 +106,52 @@ const isDomainWhitelisted = (): boolean => {
   return isAllowed;
 };
 
+const normalizeWeb3ErrorMessage = (errorInput: unknown): string => {
+  const extractCoreMessage = (message: string) => {
+    const trimmed = message.trim();
+    const separatorIndex = trimmed.indexOf(' | ');
+    if (separatorIndex > 0) {
+      return trimmed.slice(0, separatorIndex).trim();
+    }
+    return trimmed;
+  };
+
+  const parseJson = (value: string) => {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  };
+
+  const normalize = (input: unknown): string => {
+    if (!input) return 'Unknown error';
+
+    if (typeof input === 'string') {
+      const parsed = parseJson(input);
+      if (parsed) {
+        return normalize(parsed);
+      }
+      return extractCoreMessage(input);
+    }
+
+    if (typeof input === 'object') {
+      const obj = input as Record<string, unknown>;
+      if (obj.error) {
+        return normalize(obj.error);
+      }
+      const rawMessage = obj.message;
+      if (typeof rawMessage === 'string') {
+        return extractCoreMessage(rawMessage);
+      }
+    }
+
+    return extractCoreMessage(String(input));
+  };
+
+  return normalize(errorInput);
+};
+
 // 通过 Background Script 在页面上下文执行代码
 const executeViaBackgroundScript = async (method: string, args: any[] = []): Promise<any> => {
   return new Promise((resolve, reject) => {
@@ -115,12 +165,12 @@ const executeViaBackgroundScript = async (method: string, args: any[] = []): Pro
         if (chrome.runtime.lastError) {
           const error = chrome.runtime.lastError.message;
           console.error('[App] Chrome runtime error:', error);
-          reject(new Error(error));
+          reject(new Error(normalizeWeb3ErrorMessage(error)));
           return;
         }
 
         if (response?.error) {
-          reject(new Error(response.error));
+          reject(new Error(normalizeWeb3ErrorMessage(response.error)));
           return;
         }
 
@@ -264,7 +314,7 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
     const chainId = chainIdValue?.startsWith('0x') ? Number.parseInt(chainIdValue, 16) : Number(chainIdValue);
 
     const siweMessage = new SiweMessage({
-      domain: 'linklayer.ai',
+      domain: IS_DEV ? envValues.CEB_TEST_SIWE_DOMAIN : envValues.CEB_PROD_SIWE_DOMAIN,
       address: checksumAddress,
       statement: 'Sign in with Ethereum to LinkLayer AI Agent',
       uri: API_BASE_URL.replace(/\/$/, ''), // 移除末尾的斜杠
@@ -303,6 +353,10 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
     }
 
     message.success('Login successful!');
+
+    autoConfirmPendingClaims(checksumAddress).catch(err => {
+      console.warn('[App] Auto-confirm pending claims failed:', err);
+    });
 
     const addressChangedEvent = new CustomEvent('addressChanged', {
       detail: { address: result.data.address || checksumAddress },
@@ -894,7 +948,14 @@ const SidePanelContentInner = () => {
         {selectedMenuId === 4 && <Perps />}
         {selectedMenuId === 5 && <Politer />}
         {selectedMenuId === 7 && <Token />}
-        {selectedMenuId === 6 && <Points />}
+        {selectedMenuId === 6 && (
+          <Points
+            walletConnected={isConnected}
+            walletAddress={walletAddress || ''}
+            providerId={providerId || ''}
+            walletChainId={chainId || ''}
+          />
+        )}
       </PageLayout>
     );
   };
@@ -908,7 +969,7 @@ const SidePanelContentInner = () => {
       {!isOpen && showFloatingButton && (
         <div
           ref={dragButtonRef}
-          className="open-button fixed z-[11111] flex cursor-pointer rounded-bl-full rounded-tl-full bg-white py-2 pl-3 hover:bg-[#cf0]"
+          className="open-button pointer-events-auto fixed z-[11111] flex cursor-pointer rounded-bl-full rounded-tl-full bg-white py-2 pl-3 hover:bg-[#cf0]"
           style={{
             right: '0px',
             top: hasCustomPosition ? `${buttonTopPosition}px` : '20px',
@@ -1001,7 +1062,15 @@ const SidePanelContentInner = () => {
               {isLogin && (
                 <div className="mb-[2vh] flex items-center justify-center">
                   <Popover
-                    content={<LoginPanel onLogout={handleLogout} />}
+                    content={
+                      <LoginPanel
+                        onLogout={handleLogout}
+                        walletAddress={walletAddress || ''}
+                        walletChainId={chainId || ''}
+                        providerId={providerId || ''}
+                        isConnected={isConnected}
+                      />
+                    }
                     placement="topLeft"
                     trigger="click"
                     onOpenChange={handlePopoverOpenChange}>

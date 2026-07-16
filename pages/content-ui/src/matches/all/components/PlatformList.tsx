@@ -6,6 +6,8 @@ import { useI18n } from '@src/lib/i18n';
 import { platformListData, type PlatformItem } from '../lib/enum';
 import { get_cex } from '@src/api/agent_c';
 import { getSyncAssets, setSelectCex } from '@src/store/slices/assetsSlice';
+import { syncPoints } from '@src/store/slices/userSlice';
+import { store } from '@src/store';
 import type { GetAssetWithLogoItem } from '@src/api/agent_c';
 import StreamingModal from './StreamingModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -146,9 +148,15 @@ export const PlatformList = ({
 
   const displayAssets = assets.length ? assets : fallbackAssets;
 
-  const handleAssetAnalyze = (asset: GetAssetWithLogoItem) => {
+  const handleAssetAnalyze = async (asset: GetAssetWithLogoItem) => {
     if (!isLogin) {
       message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
+      return;
+    }
+    await dispatch(syncPoints());
+    const currentPoints = store.getState().user.points;
+    if (currentPoints < 10) {
+      message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
       return;
     }
 

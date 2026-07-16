@@ -44,7 +44,7 @@ const defaultInitialState: PageInfoState = {
     description: 'Recharge credits and view points history',
   },
   token: {
-    title: 'BSC State-Scanner',
+    title: 'BEP20 Liquidity Leader',
     description: 'Live on-chain filtering for the most liquid assets on BNB Chain',
   },
 };

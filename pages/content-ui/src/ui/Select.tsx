@@ -197,7 +197,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(
       if (isOpen && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         setDropdownPositionStyle({
-          position: 'fixed',
+          position: 'absolute',
           top: `${rect.bottom + 4}px`,
           left: `${rect.left}px`,
           width: `${rect.width}px`,
@@ -220,6 +220,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(
             style={{
               ...dropdownPositionStyle,
               ...dropdownStyleProp,
+              pointerEvents: 'auto',
               scrollbarWidth: 'thin',
               scrollbarColor: '#ccc #f1f5f9',
             }}

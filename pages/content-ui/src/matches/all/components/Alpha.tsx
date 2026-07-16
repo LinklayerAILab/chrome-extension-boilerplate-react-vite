@@ -181,7 +181,7 @@ export const Alpha = () => {
     return price.toFixed(6);
   };
   const formatDepth = (depth?: number) => {
-    if (!depth) return '--';
+    if (!depth) return '0';
     const str = (depth * 100).toString();
     return str.length > 5 ? str.slice(0, 5) : str;
   };

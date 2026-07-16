@@ -10,7 +10,6 @@ import {
   recommend_coin_c_streaming,
   type StreamingResponse,
 } from '@src/api/agent_c';
-import { requestTurnstileToken } from '@src/lib/turnstile';
 import type { MessageChunk } from './Typewriter';
 import { ChatMessage } from './ChatMessage';
 import TypewriterNode from './TypewriterNode';

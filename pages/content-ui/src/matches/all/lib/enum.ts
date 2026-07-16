@@ -33,8 +33,8 @@ export const platformListData: PlatformItem[] = [
     imgB: bianb,
     selected: false,
     disabled: false,
-    doc_pc: 'https://doc.linklayer.ai/guide/bnpc',
-    doc_mobile: 'https://doc.linklayer.ai/guide/bnapp',
+    doc_pc: 'https://doc.linklayer.ai/Guide/BnPc',
+    doc_mobile: 'https://doc.linklayer.ai/Guide/BnApp',
   },
   {
     name: 'OKX',
@@ -42,8 +42,8 @@ export const platformListData: PlatformItem[] = [
     imgB: okxb,
     selected: false,
     disabled: true,
-    doc_pc: 'https://doc.linklayer.ai/guide/okxpc',
-    doc_mobile: 'https://doc.linklayer.ai/guide/okxapp',
+    doc_pc: 'https://doc.linklayer.ai/Guide/OkxPc',
+    doc_mobile: 'https://doc.linklayer.ai/Guide/OkxApp',
   },
   {
     name: 'Bybit',
@@ -51,7 +51,7 @@ export const platformListData: PlatformItem[] = [
     imgB: bybitb,
     selected: false,
     disabled: true,
-    doc_pc: 'https://doc.linklayer.ai/guide/bybitpc',
+    doc_pc: 'https://doc.linklayer.ai/Guide/BybitPc',
   },
   {
     name: 'Bitget',
@@ -59,8 +59,8 @@ export const platformListData: PlatformItem[] = [
     imgB: bitgetb,
     selected: false,
     disabled: true,
-    doc_pc: 'https://doc.linklayer.ai/guide/bitgetpc',
-    doc_mobile: 'https://doc.linklayer.ai/guide/bitgetapp',
+    doc_pc: 'https://doc.linklayer.ai/Guide/BitgetPc',
+    doc_mobile: 'https://doc.linklayer.ai/Guide/BitgetApp',
   },
   {
     name: 'Coinbase',

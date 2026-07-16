@@ -14,6 +14,7 @@ const platformRoots = new Map<string, any>();
 
 // ???????????? Map
 const containerWatchers = new Map<string, NodeJS.Timeout>();
+const sidebarObservers = new Map<string, MutationObserver>();
 
 // ??????????????????????????????
 const initializeDefaultSettings = () => {
@@ -149,9 +150,11 @@ export const usePlatformInjection = (platform: 'x' | 'binance' | 'okx') => {
 
         const subscribeAnchor = document.querySelector('[aria-label="Subscribe to Premium"][role="complementary"]');
         const relevantPeopleAnchor = document.querySelector('[aria-label="Relevant people"][role="complementary"]');
-        const trendingContainer = document.querySelector('[aria-label="Trending"][tabindex="0"]');
+        const trendingContainer = document.querySelector('[data-testid="sidebarColumn"]');
+        const exploreInsertPoint = trendingContainer ? findExploreInsertPoint(trendingContainer) : null;
+        const sidebarInsertPoint = trendingContainer ? findSidebarInsertPoint(trendingContainer) : null;
 
-        if (subscribeAnchor || relevantPeopleAnchor || trendingContainer) {
+        if (subscribeAnchor || relevantPeopleAnchor || exploreInsertPoint || sidebarInsertPoint) {
           injectPlatformComponent(platform);
           injectedRef.current = true;
           retryCountRef.current = 0;
@@ -240,7 +243,7 @@ const performInjection = (platform: string) => {
   }
   const subscribeAnchor = document.querySelector('[aria-label="Subscribe to Premium"][role="complementary"]');
   const relevantPeopleAnchor = document.querySelector('[aria-label="Relevant people"][role="complementary"]');
-  const trendingContainer = document.querySelector('[aria-label="Trending"][tabindex="0"]');
+  const trendingContainer = document.querySelector('[data-testid="sidebarColumn"]');
 
   let container: HTMLDivElement | null = null;
 
@@ -274,19 +277,33 @@ const performInjection = (platform: string) => {
 
     insertParent.parentElement.insertBefore(container, insertParent);
   } else if (trendingContainer) {
-    const first = trendingContainer.firstElementChild ?? null;
-    const firstChildSecond = first?.children?.[1] ?? null;
-    const afterFirstChildSecond = firstChildSecond?.nextSibling ?? null;
+    setupSidebarObserver(platform, trendingContainer);
+    const isExplore = window.location.pathname.startsWith('/explore');
+    const exploreInsertPoint = findExploreInsertPoint(trendingContainer);
 
-    if (!first || !firstChildSecond) {
-      return;
+    if (isExplore) {
+      console.log('[X Inject][explore] sidebarColumn:', trendingContainer);
+      console.log('[X Inject][explore] insertPoint:', exploreInsertPoint);
     }
 
-    container = document.createElement('div');
-    container.id = elementId;
-    container.className = `${platform}-platform-injection`;
+    if (isExplore && exploreInsertPoint) {
+      container = document.createElement('div');
+      container.id = elementId;
+      container.className = `${platform}-platform-injection`;
+      console.log('[X Inject][explore] insert after element:', exploreInsertPoint.marker);
+      exploreInsertPoint.parent.insertBefore(container, exploreInsertPoint.after);
+    } else {
+      const insertPoint = findSidebarInsertPoint(trendingContainer);
+      if (!insertPoint) {
+        return;
+      }
 
-    first.insertBefore(container, afterFirstChildSecond);
+      container = document.createElement('div');
+      container.id = elementId;
+      container.className = `${platform}-platform-injection`;
+
+      insertPoint.parent.insertBefore(container, insertPoint.after);
+    }
   } else {
     return;
   }
@@ -481,6 +498,12 @@ const removePlatformComponent = (platform: string, options?: { cleanupWatchers?:
       clearInterval(containerWatcher);
       containerWatchers.delete(platform);
     }
+
+    const sidebarObserver = sidebarObservers.get(platform);
+    if (sidebarObserver) {
+      sidebarObserver.disconnect();
+      sidebarObservers.delete(platform);
+    }
   }
 };
 
@@ -499,6 +522,91 @@ const setupContainerWatcher = (platform: string, elementId: string) => {
   }, 2000);
 
   containerWatchers.set(platform, watcher);
+};
+
+const findSidebarInsertPoint = (sidebar: Element) => {
+  const searchForm =
+    sidebar.querySelector('form[role="search"]') ??
+    sidebar.querySelector('[data-testid="SearchBox_Search_Input"]')?.closest('form');
+
+  if (!searchForm) {
+    return null;
+  }
+
+  let current: Element | null = searchForm;
+  while (current && current !== sidebar) {
+    const parent = current.parentElement;
+    if (!parent) {
+      break;
+    }
+
+    const siblings = Array.from(parent.children);
+    const startIndex = siblings.indexOf(current) + 1;
+    for (let i = startIndex; i < siblings.length; i += 1) {
+      const sibling = siblings[i];
+      if (sibling.tagName !== 'DIV') {
+        continue;
+      }
+
+      if (sibling.childElementCount === 0 && (sibling.textContent ?? '').trim() === '') {
+        return { parent, after: sibling.nextSibling };
+      }
+    }
+
+    current = parent;
+  }
+
+  return null;
+};
+
+const findExploreInsertPoint = (sidebar: Element) => {
+  const aside = sidebar.querySelector('aside[role="complementary"]');
+  if (!aside) {
+    return null;
+  }
+
+  let current: Element | null = aside;
+  while (current && current !== sidebar) {
+    const parent = current.parentElement;
+    if (!parent) {
+      break;
+    }
+
+    const children = Array.from(parent.children);
+    const firstChild = parent.firstElementChild;
+
+    if (
+      firstChild &&
+      children.length >= 2 &&
+      children[1]?.contains(aside) &&
+      firstChild.childElementCount === 0 &&
+      (firstChild.textContent ?? '').trim() === ''
+    ) {
+      return { parent, after: firstChild.nextSibling, marker: firstChild };
+    }
+
+    current = parent;
+  }
+
+  return null;
+};
+
+const setupSidebarObserver = (platform: string, element: Element) => {
+  const existing = sidebarObservers.get(platform);
+  if (existing) {
+    existing.disconnect();
+  }
+
+  const observer = new MutationObserver(() => {
+    injectPlatformComponent(platform);
+  });
+
+  observer.observe(element, {
+    childList: true,
+    subtree: true,
+  });
+
+  sidebarObservers.set(platform, observer);
 };
 
 // ???????$????????????????????????

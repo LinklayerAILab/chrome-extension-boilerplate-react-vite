@@ -1,14 +1,14 @@
 import { useState, useEffect, ReactNode, memo } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@src/store';
+import { useSelector, useDispatch } from 'react-redux';
+import type { RootState, AppDispatch } from '@src/store';
 import { useI18n } from '@src/lib/i18n';
 import { Input, message } from '@src/ui';
 import StreamingModal from './StreamingModal';
 import TendBox from './TendBox';
 import CoinList from './CoinList';
 import { setPageInfo } from '@src/store/slices/pageInfoSlice';
-import type { AppDispatch } from '@src/store';
-import { useDispatch } from 'react-redux';
+import { syncPoints } from '@src/store/slices/userSlice';
+import { store } from '@src/store';
 import { usePageInfoUpdate } from '@src/lib/hooks/usePageInfoUpdate';
 import { CoinHeader } from './CoinHeader';
 import { StrategyHeader } from './StrategyHeader';
@@ -99,6 +99,13 @@ export const Politer = memo(() => {
       message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
       return;
     }
+    await dispatch(syncPoints());
+    const currentPoints = store.getState().user.points;
+    if (currentPoints < 10) {
+      message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
+      return;
+    }
+
     const typeStr = coinType === 2 ? (tAny?.agent?.contract ?? 'contract') : '';
     const query = `${tAny?.agent?.analyze ?? 'Analyze'} ${symbol} ${typeStr}`.trim();
 
@@ -122,6 +129,12 @@ export const Politer = memo(() => {
   const handleStrategyAnalyze = async (strategy: TendBoxStrategyItem) => {
     if (!isLogin) {
       message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
+      return;
+    }
+    await dispatch(syncPoints());
+    const currentPoints = store.getState().user.points;
+    if (currentPoints < 10) {
+      message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
       return;
     }
 
