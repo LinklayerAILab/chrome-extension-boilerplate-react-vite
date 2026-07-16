@@ -816,8 +816,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // 监听扩展安装/更新
-chrome.runtime.onInstalled.addListener(() => {
+const STORAGE_KEY_INSTALL_ID = '@Linklayerai/installId';
+
+chrome.runtime.onInstalled.addListener(async () => {
   console.log('[Background] Extension installed/updated');
+
+  // 生成并持久化 installId（用于 Chestо 任务验证）
+  const existing = await chrome.storage.local.get(STORAGE_KEY_INSTALL_ID);
+  if (!existing[STORAGE_KEY_INSTALL_ID]) {
+    const installId = crypto.randomUUID();
+    await chrome.storage.local.set({ [STORAGE_KEY_INSTALL_ID]: installId });
+    console.log('[Background] Generated installId:', installId);
+  }
 
   // 向所有已打开的标签页注入事件监听�?
   chrome.tabs.query({}, tabs => {
@@ -881,3 +891,66 @@ chrome.runtime.onConnect.addListener(port => {
       });
   });
 });
+
+// ========================================
+// Chestо 任务验证 - 外部消息处理
+// ========================================
+
+chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  // 仅接受来自 chesto.ai 的消息
+  if (!sender.url || !sender.url.startsWith('https://chesto.ai/')) {
+    console.warn('[Background] Rejected external message from:', sender.url);
+    return false;
+  }
+
+  if (request.type === 'CHESTO_VERIFY') {
+    handleChestoVerify(request, sendResponse);
+    return true;
+  }
+
+  return false;
+});
+
+async function handleChestoVerify(request: { claimToken?: string }, sendResponse: (response: unknown) => void) {
+  try {
+    const { claimToken } = request;
+    if (!claimToken) {
+      sendResponse({ success: false, error: 'Missing claimToken' });
+      return;
+    }
+
+    const stored = await chrome.storage.local.get(STORAGE_KEY_INSTALL_ID);
+    const installId = stored[STORAGE_KEY_INSTALL_ID];
+
+    if (!installId) {
+      sendResponse({ success: false, error: 'No installId found' });
+      return;
+    }
+
+    const manifest = chrome.runtime.getManifest();
+    const extensionVersion = manifest.version;
+    const extensionId = chrome.runtime.id;
+
+    const apiBaseUrl = process.env.CEB_AGENT_C_API || 'https://cagent.linklayer.ai';
+    const response = await fetch(`${apiBaseUrl}/v1/chesto/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        claimToken,
+        event: 'extension_first_open',
+        extensionId,
+        installId,
+        extensionVersion,
+      }),
+    });
+
+    const data = await response.json();
+    sendResponse({ success: response.ok, data });
+  } catch (error) {
+    console.error('[Background] Chesto verify error:', error);
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
