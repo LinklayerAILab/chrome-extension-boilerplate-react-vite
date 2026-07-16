@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { Locale, LocaleMessages } from './index';
 import { locales, getBrowserLocale, STORAGE_KEY } from './index';
+import { LOCALE_KEY } from '@src/lib/storageKeys';
 
 interface I18nContextType {
   locale: Locale;
@@ -16,6 +17,12 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
   const [messages, setMessages] = useState<LocaleMessages>(locales[locale]);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  const syncLocale = (newLocale: Locale) => {
+    setLocaleState(newLocale);
+    setMessages(locales[newLocale]);
+    window.localStorage.setItem(LOCALE_KEY, newLocale);
+  };
+
   useEffect(() => {
     // Only run once
     if (isInitialized) return;
@@ -28,8 +35,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
             const savedLocale = result[STORAGE_KEY] as Locale;
             if (savedLocale in locales) {
               console.log('[I18nProvider] Setting locale from storage:', savedLocale);
-              setLocaleState(savedLocale);
-              setMessages(locales[savedLocale]);
+              syncLocale(savedLocale);
             }
           }
           setIsInitialized(true);
@@ -50,8 +56,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
         console.log('[I18nProvider] Locale change detected:', newLocale);
         if (newLocale && newLocale in locales) {
           console.log('[I18nProvider] Updating locale to:', newLocale);
-          setLocaleState(newLocale);
-          setMessages(locales[newLocale]);
+          syncLocale(newLocale);
         }
       }
     };
@@ -68,8 +73,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
   const changeLocale = (newLocale: Locale) => {
     console.log('[I18nProvider] changeLocale called:', newLocale, 'STORAGE_KEY:', STORAGE_KEY);
     if (newLocale in locales) {
-      setLocaleState(newLocale);
-      setMessages(locales[newLocale]);
+      syncLocale(newLocale);
 
       // Save to chrome.storage
       try {

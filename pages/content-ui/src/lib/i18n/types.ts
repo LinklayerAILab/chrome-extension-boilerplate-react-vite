@@ -144,6 +144,7 @@ export interface LocaleMessages {
     emailAddress: string;
     myPoints: string;
     myInvite: string;
+    connectFirst: string;
   };
   alpha: {
     myAlphaHolding: string;
@@ -184,6 +185,11 @@ export interface LocaleMessages {
     optimal: string;
     lpStability: string;
     trade: string;
+    select: string;
+    transactionFailed: string;
+    insufficientBalance: string;
+    transactionSubmitted: string;
+    switchNetwork: string;
   };
   agent: {
     tokenName: string;
@@ -211,8 +217,11 @@ export interface LocaleMessages {
     scanTip: string;
     download: string;
     trading: string;
+    update: string;
     token: string;
     tokenDesc: string;
+    inputPlaceholder?: string;
+    startAnalysis?: string;
   };
   home: {
     retroactiveBonus: string;
@@ -230,6 +239,8 @@ export interface LocaleMessages {
     rewards: string;
     claim: string;
     claimHistory: string;
+    oneTime: string;
+    monthly: string;
   };
   myPoints: {
     rechargePoints: string;
@@ -237,6 +248,7 @@ export interface LocaleMessages {
     recharge: string;
     pointsRecord: string;
     points: string;
+    waitingConfirmation: string;
   };
   invite: {
     shareTitle: string;
@@ -282,5 +294,30 @@ export interface LocaleMessages {
       title: string;
       description: string;
     };
+  };
+  claim: {
+    title: string;
+    claimButton: string;
+    claiming: string;
+    claimSuccess: string;
+    claimFailed: string;
+    stepCheckBalance: string;
+    stepFetchNonce: string;
+    stepSignMessage: string;
+    stepSubmitClaim: string;
+    stepSwitchChain: string;
+    stepExecuteContract: string;
+    stepWaitReceipt: string;
+    stepConfirmClaim: string;
+    stepSuccess: string;
+    historyTitle: string;
+    historyEmpty: string;
+    statusPending: string;
+    statusConfirmed: string;
+    statusFailed: string;
+    walletRequired: string;
+    viewOnBscScan: string;
+    frozenAmount: string;
+    frozenTip: string;
   };
 }
