@@ -75,22 +75,6 @@ chrome.action.onClicked.addListener(async tab => {
   }
 });
 
-const TURNSTILE_OFFSCREEN_URL = chrome.runtime.getURL('turnstile-offscreen.html');
-let turnstileOffscreenReady: Promise<void> | null = null;
-
-const ensureTurnstileOffscreen = async () => {
-  if (!chrome.offscreen) return;
-  if (await chrome.offscreen.hasDocument()) return;
-  if (!turnstileOffscreenReady) {
-    turnstileOffscreenReady = chrome.offscreen.createDocument({
-      url: TURNSTILE_OFFSCREEN_URL,
-      reasons: [chrome.offscreen.Reason.DOM_PARSER],
-      justification: 'Render Turnstile in an extension context to avoid page CSP',
-    });
-  }
-  await turnstileOffscreenReady;
-};
-
 // ========================================
 // Web3 Wallet Support - via Background Script
 // ========================================
@@ -124,18 +108,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       })
       .catch(error => sendResponse({ ok: false, error: error.message || String(error) }));
-    return true;
-  }
-  if (request.type === 'TURNSTILE_TOKEN_REQUEST') {
-    ensureTurnstileOffscreen()
-      .then(() => chrome.runtime.sendMessage(request))
-      .catch(error => {
-        chrome.runtime.sendMessage({
-          type: 'TURNSTILE_TOKEN_RESPONSE',
-          requestId: request.requestId,
-          error: error?.message || String(error),
-        });
-      });
     return true;
   }
   if (request.type === 'WEB3_REQUEST') {
@@ -192,22 +164,50 @@ async function handleWeb3Request(request: any, sender: chrome.runtime.MessageSen
       func: async (_method: string, _methodArgs: any[]) => {
         // 这段代码现在运行在页面主上下文！
         const formatError = (error: any) => {
-          if (!error) return 'Unknown error';
-          if (typeof error === 'string') return error;
+          const extractCoreMessage = (message: string) => {
+            const trimmed = message.trim();
+            const separatorIndex = trimmed.indexOf(' | ');
+            if (separatorIndex > 0) {
+              return trimmed.slice(0, separatorIndex).trim();
+            }
+            return trimmed;
+          };
 
-          const message = error?.message || error?.toString?.() || 'Unknown error';
-          const details: Record<string, any> = {};
-          if (error?.name) details.name = error.name;
-          if (error?.code !== undefined) details.code = error.code;
-          if (error?.data !== undefined) details.data = error.data;
-          if (error?.stack) details.stack = error.stack;
+          const parseJson = (value: string) => {
+            try {
+              return JSON.parse(value);
+            } catch {
+              return null;
+            }
+          };
 
-          try {
-            const detailString = Object.keys(details).length > 0 ? ` | ${JSON.stringify(details)}` : '';
-            return `${message}${detailString}`;
-          } catch {
-            return message;
-          }
+          const normalize = (input: any): string => {
+            if (!input) return 'Unknown error';
+
+            if (typeof input === 'string') {
+              const parsed = parseJson(input);
+              if (parsed) {
+                return normalize(parsed);
+              }
+              return extractCoreMessage(input);
+            }
+
+            if (typeof input === 'object' && input.error) {
+              return normalize(input.error);
+            }
+
+            const code = input?.code ?? input?.data?.code;
+            const rawMessage = input?.message || input?.toString?.() || 'Unknown error';
+            const message = extractCoreMessage(String(rawMessage));
+
+            if (code === 4001 || code === '4001') {
+              return message || 'User denied request.';
+            }
+
+            return message || 'Unknown error';
+          };
+
+          return normalize(error);
         };
 
         const requestWithTimeout = async <T>(promise: Promise<T>, ms = 12000): Promise<T> => {
@@ -704,7 +704,7 @@ async function injectWalletEventListeners(tabId: number, retryCount = 0) {
     await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      func: () => {
+      func: (extensionId: string) => {
         if (typeof window.ethereum === 'undefined') {
           console.log('[Wallet Events] No ethereum provider found');
           return { success: false, error: 'No ethereum provider' };
@@ -722,7 +722,7 @@ async function injectWalletEventListeners(tabId: number, retryCount = 0) {
         // 监听账户变化
         window.ethereum.on('accountsChanged', (accounts: string[]) => {
           console.log('[Wallet Events] accountsChanged:', accounts);
-          chrome.runtime.sendMessage({
+          chrome.runtime.sendMessage(extensionId, {
             type: 'WALLET_EVENT',
             event: 'accountsChanged',
             data: { accounts },
@@ -732,7 +732,7 @@ async function injectWalletEventListeners(tabId: number, retryCount = 0) {
         // 监听链ID变化
         window.ethereum.on('chainChanged', (chainId: string) => {
           console.log('[Wallet Events] chainChanged:', chainId);
-          chrome.runtime.sendMessage({
+          chrome.runtime.sendMessage(extensionId, {
             type: 'WALLET_EVENT',
             event: 'chainChanged',
             data: { chainId },
@@ -742,7 +742,7 @@ async function injectWalletEventListeners(tabId: number, retryCount = 0) {
         // 监听连接事件
         window.ethereum.on('connect', (connectInfo: { chainId: string }) => {
           console.log('[Wallet Events] connect:', connectInfo);
-          chrome.runtime.sendMessage({
+          chrome.runtime.sendMessage(extensionId, {
             type: 'WALLET_EVENT',
             event: 'connect',
             data: connectInfo,
@@ -752,7 +752,7 @@ async function injectWalletEventListeners(tabId: number, retryCount = 0) {
         // 监听断开连接事件
         window.ethereum.on('disconnect', (error: { code: number; message: string }) => {
           console.log('[Wallet Events] disconnect:', error);
-          chrome.runtime.sendMessage({
+          chrome.runtime.sendMessage(extensionId, {
             type: 'WALLET_EVENT',
             event: 'disconnect',
             data: error,
@@ -764,6 +764,7 @@ async function injectWalletEventListeners(tabId: number, retryCount = 0) {
         console.log('[Wallet Events] Event listeners installed successfully');
         return { success: true, message: 'Installed' };
       },
+      args: [chrome.runtime.id],
     });
     console.log('[Background] Wallet event listeners injected for tab:', tabId);
   } catch (error) {
