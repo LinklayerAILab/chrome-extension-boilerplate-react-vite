@@ -28,11 +28,11 @@ service.interceptors.request.use(config => {
   }
 
   if (config.headers?.set) {
-    config.headers.set('Source', '1');
+    config.headers.set('Source', '5');
   } else if (config.headers) {
-    (config.headers as Record<string, string>)['Source'] = '1';
+    (config.headers as Record<string, string>)['Source'] = '5';
   } else {
-    config.headers = { Source: '1' };
+    config.headers = { Source: '5' };
   }
 
   if (accessToken) {
@@ -54,13 +54,13 @@ service.interceptors.response.use(
       return Promise.reject(response);
     }
     if (response.data?.code !== 0) {
-      return Promise.reject(response);
+      return Promise.reject(new Error(response.data?.message || 'Request failed'));
     }
     return response.data;
   },
   (error: AxiosError<any>) => {
     const data = error.response?.data as { code?: number; message?: string } | undefined;
-    // 只处理 401 错误，其他错误不显示 Message
+    // 只处理 401 错误，其他错误构造 Error 对象抛出
     if (data?.code === 401 || error.response?.status === 401) {
       store.dispatch(setIsLogin(false));
       store.dispatch(setSidePanelOpen(false));
@@ -69,6 +69,7 @@ service.interceptors.response.use(
       window.localStorage.removeItem(ACCESS_TOKEN_KEY);
     }
 
-    return Promise.reject(error);
+    const msg = data?.message || error.message || 'Network error';
+    return Promise.reject(new Error(msg));
   },
 );

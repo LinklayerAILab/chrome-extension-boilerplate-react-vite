@@ -39,17 +39,23 @@ export interface GetCollectCResponse extends ApiResponse {
 }
 
 export interface ClaimInfoItem {
-  claim_amount: number;
-  claim_flag: boolean;
-  claim_time: number;
-  period_end: number;
-  period_start: number;
+  id: number;
+  user_id: string;
+  channel_id: number;
+  channel_type: string;
+  reference_id: string;
+  amount: number;
+  before_balance: number;
+  after_balance: number;
+  pool_before: number;
+  pool_after: number;
+  created_at: string;
 }
 
 export interface ClaimInfoResponse extends ApiResponse {
   data: {
-    claim_info: ClaimInfoItem[];
-    total_count: number;
+    records: ClaimInfoItem[];
+    total: number;
   };
 }
 
@@ -115,7 +121,7 @@ export interface GetUserInfoResponse extends ApiResponse {
   };
 }
 
-export const get_user_info = () => {
+export const get_user_info = (): Promise<GetUserInfoResponse> => {
   return service.get<GetUserInfoResponse>(`${API_BASE_URL}/v1/get_userinfo`);
 };
 
@@ -131,7 +137,7 @@ export const get_collect_c = () => {
   return service.get<GetCollectCResponse>(`${API_BASE_URL}/v1/get_collect`);
 };
 
-export const get_claim_info = (params: { cex_name: string }): Promise<ClaimInfoResponse> => {
+export const get_claim_info = (params: { cex_name: string; channel_ids: number[] }): Promise<ClaimInfoResponse> => {
   return service
     .post<ClaimInfoResponse>(`${API_BASE_URL}/v1/claim_info`, params)
     .then(res => res as unknown as ClaimInfoResponse);
@@ -988,6 +994,7 @@ export const getBinanceUpdateTime = (): Promise<GetBinanceUpdateTimeResponse> =>
 export interface LLAxBalanceData {
   balance: {
     balance: number;
+    frozen_amount: number;
     total_earned: number;
     total_consumed: number;
   };
@@ -1001,4 +1008,72 @@ export const get_llax_balance = (): Promise<LLAxBalanceResponse> => {
   return service.get(`/v1/llax/balance`, {
     cache: 'no-store',
   });
+};
+
+// ============ LLAx Claim ============
+
+export interface LLAxClaimNonceData {
+  nonce: string;
+  amount: number;
+}
+
+export interface LLAxClaimNonceResponse extends ApiResponse {
+  data: LLAxClaimNonceData;
+}
+
+export interface LLAxClaimRequest {
+  to_address: string;
+  signature: string;
+  signed_message: string;
+}
+
+export interface LLAxClaimData {
+  claim_id: number;
+  status: string;
+  amount: number;
+  chain_amount: string;
+  to_address: string;
+  contract_address: string;
+  nonce: string;
+  deadline: number;
+  signature: string;
+}
+
+export interface LLAxClaimResponse extends ApiResponse {
+  data: LLAxClaimData;
+}
+
+export interface LLAxClaimRecord {
+  id: number;
+  amount: number;
+  to_address: string;
+  status: string;
+  tx_hash: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LLAxClaimRecordsResponse extends ApiResponse {
+  data: LLAxClaimRecord[];
+}
+
+export interface ConfirmClaimRequest {
+  claim_id: number;
+  tx_hash: string;
+}
+
+export const get_llax_claim_nonce = (): Promise<LLAxClaimNonceResponse> => {
+  return service.get('/v1/llax/claim/nonce');
+};
+
+export const claim_llax = (params: LLAxClaimRequest): Promise<LLAxClaimResponse> => {
+  return service.post('/v1/llax/claim', params);
+};
+
+export const get_llax_claim_records = (): Promise<LLAxClaimRecordsResponse> => {
+  return service.get('/v1/llax/claim/records');
+};
+
+export const confirm_llax_claim = (params: ConfirmClaimRequest): Promise<ApiResponse> => {
+  return service.post('/v1/llax/claim/confirm', params);
 };

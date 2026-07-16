@@ -1,4 +1,4 @@
-import { ACCESS_TOKEN_KEY, ADDRESS_KEY, WEB_APP_DATA_KEY } from '@src/lib/storageKeys';
+import { ACCESS_TOKEN_KEY, ADDRESS_KEY, WEB_APP_DATA_KEY, LOCALE_KEY } from '@src/lib/storageKeys';
 import { store } from '@src/store';
 import { setIsLogin } from '@src/store/slices/userSlice';
 import { setSidePanelOpen, setSelectedMenuId } from '@src/store/slices/uiSlice';
@@ -59,6 +59,11 @@ export async function* streamingRequest<TResponse = SSEMessageEvent>(
   (config.headers as Headers).set('Expires', '0');
   (config.headers as Headers).set('X-Accel-Buffering', 'no');
   (config.headers as Headers).set('Accept', 'text/event-stream');
+
+  const savedLocale = window.localStorage.getItem(LOCALE_KEY);
+  if (savedLocale) {
+    (config.headers as Headers).set('accept-language', savedLocale);
+  }
 
   // Add anti-cache timestamp
   urlObj.searchParams.set('_t', Date.now().toString());

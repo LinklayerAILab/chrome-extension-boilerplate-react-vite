@@ -6,6 +6,15 @@ import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import type { UserConfig } from 'vite';
 
+// Build explicit define entries for env vars used in browser code
+const envDefine: Record<string, string> = {};
+for (const [key, value] of Object.entries(env)) {
+  envDefine[`process.env.${key}`] = JSON.stringify(value);
+}
+
+// Debug: log env vars being injected
+console.log('[vite-config] Injecting env vars:', Object.keys(envDefine));
+
 export const watchOption = IS_DEV
   ? {
       chokidar: {
@@ -19,6 +28,7 @@ export const withPageConfig = (config: UserConfig) =>
     deepmerge(
       {
         define: {
+          ...envDefine,
           'process.env': env,
         },
         base: '',
