@@ -14,6 +14,7 @@ console.log("Edit 'chrome-extension/src/background/index.ts' and save to reload.
 
 chrome.action.onClicked.addListener(async tab => {
   console.log('[Background] Extension icon clicked, opening content-ui side panel');
+  recordFirstOpen();
 
   if (!tab.id) {
     console.error('[Background] No tab ID');
@@ -134,6 +135,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     getProviderId(sender)
       .then(sendResponse)
       .catch(error => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.type === 'RECORD_FIRST_OPEN') {
+    recordFirstOpen();
+    sendResponse({ success: true });
     return true;
   }
 
@@ -818,16 +825,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // 监听扩展安装/更新
 const STORAGE_KEY_INSTALL_ID = '@Linklayerai/installId';
+const STORAGE_KEY_INSTALLED_AT = '@Linklayerai/installedAt';
+const STORAGE_KEY_FIRST_OPENED_AT = '@Linklayerai/firstOpenedAt';
+
+function nowUnix(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+async function recordFirstOpen(): Promise<void> {
+  const existing = await chrome.storage.local.get(STORAGE_KEY_FIRST_OPENED_AT);
+  if (!existing[STORAGE_KEY_FIRST_OPENED_AT]) {
+    await chrome.storage.local.set({ [STORAGE_KEY_FIRST_OPENED_AT]: nowUnix() });
+    console.log('[Background] Recorded firstOpenedAt');
+  }
+}
 
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('[Background] Extension installed/updated');
 
-  // 生成并持久化 installId（用于 Chestо 任务验证）
-  const existing = await chrome.storage.local.get(STORAGE_KEY_INSTALL_ID);
+  // 生成并持久化 installId 和 installedAt（用于 Chestо 任务验证）
+  const existing = await chrome.storage.local.get([STORAGE_KEY_INSTALL_ID, STORAGE_KEY_INSTALLED_AT]);
   if (!existing[STORAGE_KEY_INSTALL_ID]) {
     const installId = crypto.randomUUID();
-    await chrome.storage.local.set({ [STORAGE_KEY_INSTALL_ID]: installId });
+    const now = nowUnix();
+    await chrome.storage.local.set({
+      [STORAGE_KEY_INSTALL_ID]: installId,
+      [STORAGE_KEY_INSTALLED_AT]: now,
+    });
     console.log('[Background] Generated installId:', installId);
+
+    // 上报安装事件到服务器
+    const manifest = chrome.runtime.getManifest();
+    const apiBaseUrl = process.env.CEB_AGENT_C_API || 'https://cagent.linklayer.ai';
+    fetch(`${apiBaseUrl}/v1/extension/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ installId, extensionVersion: manifest.version }),
+    })
+      .then(res => res.json())
+      .then(data => console.log('[Background] Install event reported:', data))
+      .catch(err => console.error('[Background] Failed to report install event:', err));
+  } else if (!existing[STORAGE_KEY_INSTALLED_AT]) {
+    await chrome.storage.local.set({ [STORAGE_KEY_INSTALLED_AT]: nowUnix() });
   }
 
   // 向所有已打开的标签页注入事件监听�?
@@ -904,7 +943,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     return false;
   }
 
-  if (request.type === 'CHESTO_VERIFY') {
+  if (request.type === 'CHESTO_EXTENSION_VERIFY') {
     handleChestoVerify(request, sendResponse);
     return true;
   }
@@ -912,16 +951,25 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
   return false;
 });
 
-async function handleChestoVerify(request: { claimToken?: string }, sendResponse: (response: unknown) => void) {
+async function handleChestoVerify(
+  request: { claimToken?: string; attemptId?: string; taskId?: string },
+  sendResponse: (response: unknown) => void,
+) {
   try {
-    const { claimToken } = request;
+    const { claimToken, attemptId, taskId } = request;
     if (!claimToken) {
       sendResponse({ success: false, error: 'Missing claimToken' });
       return;
     }
 
-    const stored = await chrome.storage.local.get(STORAGE_KEY_INSTALL_ID);
-    const installId = stored[STORAGE_KEY_INSTALL_ID];
+    const stored = await chrome.storage.local.get([
+      STORAGE_KEY_INSTALL_ID,
+      STORAGE_KEY_INSTALLED_AT,
+      STORAGE_KEY_FIRST_OPENED_AT,
+    ]);
+    const installId: string | undefined = stored[STORAGE_KEY_INSTALL_ID];
+    const installedAt: number | undefined = stored[STORAGE_KEY_INSTALLED_AT];
+    const firstOpenedAt: number | undefined = stored[STORAGE_KEY_FIRST_OPENED_AT];
 
     if (!installId) {
       sendResponse({ success: false, error: 'No installId found' });
@@ -930,18 +978,19 @@ async function handleChestoVerify(request: { claimToken?: string }, sendResponse
 
     const manifest = chrome.runtime.getManifest();
     const extensionVersion = manifest.version;
-    const extensionId = chrome.runtime.id;
 
     const apiBaseUrl = process.env.CEB_AGENT_C_API || 'https://cagent.linklayer.ai';
-    const response = await fetch(`${apiBaseUrl}/v1/chesto/verify`, {
+    const response = await fetch(`${apiBaseUrl}/v1/extension/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         claimToken,
-        event: 'extension_first_open',
-        extensionId,
+        attemptId,
+        taskId,
         installId,
         extensionVersion,
+        installedAt,
+        firstOpenedAt,
       }),
     });
 

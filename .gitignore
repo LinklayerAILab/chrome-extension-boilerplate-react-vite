@@ -27,3 +27,7 @@ docs/任务需求.md
 
 # compiled
 **/tailwind-output.css
+
+# local tooling / personal configs
+.claude/settings.local.json
+.superpowers/
