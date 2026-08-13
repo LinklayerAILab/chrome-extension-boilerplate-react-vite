@@ -676,40 +676,27 @@ export const XPlatformComponent = () => {
     };
   }, []);
 
-  // [DEMO] 演示模式：每 6 秒在三种状态间循环切换，用于观察动画效果
-  // 正式逻辑（参考 Brc20 实现）：挂载拉取一次 + 每 60s 轮询 getBinanceMarketLiquidity()
-  // 切回真实接口时，用下方注释段替换本 useEffect 即可
+  // 获取市场流动性等级，挂载时拉取一次并每分钟刷新（参考 Brc20 实现）
   useEffect(() => {
-    const levels: BinanceMarketLiquidityLevel[] = ['Healthy', 'Caution', 'Critical'];
-    let index = 0;
-    setLiquidityLevel(levels[0]);
-    const interval = setInterval(() => {
-      index = (index + 1) % levels.length;
-      setLiquidityLevel(levels[index]);
-    }, 6000);
+    const fetchLiquidity = async () => {
+      try {
+        const res = await getBinanceMarketLiquidity();
+        const level = res.data?.level;
+        if (level === 'Healthy' || level === 'Caution' || level === 'Critical') {
+          setLiquidityLevel(level);
+        } else {
+          setLiquidityLevel(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch market liquidity:', error);
+        setLiquidityLevel(null);
+      }
+    };
+
+    fetchLiquidity();
+    const interval = setInterval(fetchLiquidity, 60000);
     return () => clearInterval(interval);
   }, []);
-
-  // 真实接口逻辑（保留备用）：
-  // useEffect(() => {
-  //   const fetchLiquidity = async () => {
-  //     try {
-  //       const res = await getBinanceMarketLiquidity();
-  //       const level = res.data?.level;
-  //       if (level === 'Healthy' || level === 'Caution' || level === 'Critical') {
-  //         setLiquidityLevel(level);
-  //       } else {
-  //         setLiquidityLevel(null);
-  //       }
-  //     } catch (error) {
-  //       console.error('Failed to fetch market liquidity:', error);
-  //       setLiquidityLevel(null);
-  //     }
-  //   };
-  //   fetchLiquidity();
-  //   const interval = setInterval(fetchLiquidity, 60000);
-  //   return () => clearInterval(interval);
-  // }, []);
 
   const themeClass = theme === 'light' ? 'light' : 'dark';
 
