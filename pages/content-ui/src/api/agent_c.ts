@@ -989,6 +989,26 @@ export const getBinanceUpdateTime = (): Promise<GetBinanceUpdateTimeResponse> =>
   return service.get(`/v1/binance_update_time`).then(res => res as unknown as GetBinanceUpdateTimeResponse);
 };
 
+// ============ Binance Market Liquidity ============
+// GET /v1/binance_market_liquidity，无请求参数
+
+export type BinanceMarketLiquidityLevel = 'Healthy' | 'Caution' | 'Critical';
+
+export interface BinanceMarketLiquidityData {
+  /** 健康等级：Healthy / Caution / Critical（冷启动时可能为空） */
+  level: string;
+  /** 0-100 健康分（冷启动时为 0） */
+  healthScore: number;
+}
+
+export interface GetBinanceMarketLiquidityResponse extends ApiResponse {
+  data: BinanceMarketLiquidityData;
+}
+
+export const getBinanceMarketLiquidity = (): Promise<GetBinanceMarketLiquidityResponse> => {
+  return service.get(`/v1/binance_market_liquidity`).then(res => res as unknown as GetBinanceMarketLiquidityResponse);
+};
+
 // ============ LLAx Balance ============
 
 export interface LLAxBalanceData {

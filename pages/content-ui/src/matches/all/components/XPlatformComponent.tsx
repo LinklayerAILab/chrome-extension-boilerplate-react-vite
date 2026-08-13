@@ -1,10 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { store } from '@src/store';
-import type { BinanceTokenScreenItem } from '@src/api/agent_c';
-import { getBinanceTokenScreen, getBinanceActivePoolsCount, getBinanceUpdateTime } from '@src/api/agent_c';
+import type { BinanceTokenScreenItem, BinanceMarketLiquidityLevel } from '@src/api/agent_c';
+import {
+  getBinanceTokenScreen,
+  getBinanceActivePoolsCount,
+  getBinanceUpdateTime,
+  getBinanceMarketLiquidity,
+} from '@src/api/agent_c';
 import { setSelectedMenuId, setSidePanelOpen } from '@src/store/slices/uiSlice';
 import { setTokenList } from '@src/store/slices/tokenSlice';
 import { StatusIndicator } from './StatusIndicator';
+import { LiquidTube } from './LiquidTube';
 import inlineCss from '../../../../dist/all/index.css?inline';
 
 // 检测 Twitter/X 平台的主题
@@ -174,8 +180,6 @@ const listTop = chrome.runtime.getURL('content-ui/xInject/listTop.svg');
 const coin = chrome.runtime.getURL('content-ui/xInject/coin.svg');
 const topDark = chrome.runtime.getURL('content-ui/xInject/top-dark.svg');
 const topLight = chrome.runtime.getURL('content-ui/xInject/top-light.svg');
-const greenDark = chrome.runtime.getURL('content-ui/xInject/green-dark.svg');
-const greenLight = chrome.runtime.getURL('content-ui/xInject/green-light.svg');
 const defaultTokenLogo = chrome.runtime.getURL('content-ui/coins/bnb.svg');
 
 // 注入 Tailwind CSS 到宿主页面（XPlatformComponent 不在 Shadow DOM 中）
@@ -267,12 +271,19 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
          background-color: #F8FFDC;
       border: 1px solid #C4F402;
       border-radius: 8px;
+      --tube-bg: #F8FFDC;
       }
       .x-platform-token-chart-img.light{
             background-color: #F2F2F2;
       border: 1px solid #F2F2F2;
       border-radius: 8px;
+      --tube-bg: #F2F2F2;
 }
+    /* LiquidTube 占位尺寸（对齐原 54x90 图片） */
+    .x-platform-token-chart-img .liquid-tube-svg-wrapper {
+      width: 54px;
+      height: 90px;
+    }
     .x-platform-token-header {
       display: flex;
       align-items: center;
@@ -532,6 +543,25 @@ const injectStyles = (lightBgImage: string, darkBgImage: string) => {
       box-shadow: inset 0 2px 0 0 #fff, 0 0 0 2px rgba(27, 27, 27, 0.6);
     }
   }
+
+  /* LiquidTube 脉动发光动画——发光色由组件内联 --liquid-glow 提供 */
+  @keyframes liquidTubePulse {
+    0% {
+      filter: drop-shadow(0 0 0 var(--liquid-glow));
+    }
+    18% {
+      filter: drop-shadow(0 0 8px var(--liquid-glow));
+    }
+    34% {
+      filter: drop-shadow(0 0 2px var(--liquid-glow));
+    }
+    72% {
+      filter: drop-shadow(0 0 8px var(--liquid-glow));
+    }
+    100% {
+      filter: drop-shadow(0 0 0 var(--liquid-glow));
+    }
+  }
   `;
 
   document.head.appendChild(style);
@@ -543,6 +573,7 @@ export const XPlatformComponent = () => {
   const [tokens, setTokens] = useState<BinanceTokenScreenItem[]>(() => store.getState().tokens.tokenList);
   const [activePoolCount, setActivePoolCount] = useState<number>(0);
   const [relativeTime, setRelativeTime] = useState('3m ago');
+  const [liquidityLevel, setLiquidityLevel] = useState<BinanceMarketLiquidityLevel | null>(null);
 
   useEffect(() => {
     const updateTheme = () => setTheme(getSystemTheme());
@@ -645,6 +676,41 @@ export const XPlatformComponent = () => {
     };
   }, []);
 
+  // [DEMO] 演示模式：每 6 秒在三种状态间循环切换，用于观察动画效果
+  // 正式逻辑（参考 Brc20 实现）：挂载拉取一次 + 每 60s 轮询 getBinanceMarketLiquidity()
+  // 切回真实接口时，用下方注释段替换本 useEffect 即可
+  useEffect(() => {
+    const levels: BinanceMarketLiquidityLevel[] = ['Healthy', 'Caution', 'Critical'];
+    let index = 0;
+    setLiquidityLevel(levels[0]);
+    const interval = setInterval(() => {
+      index = (index + 1) % levels.length;
+      setLiquidityLevel(levels[index]);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 真实接口逻辑（保留备用）：
+  // useEffect(() => {
+  //   const fetchLiquidity = async () => {
+  //     try {
+  //       const res = await getBinanceMarketLiquidity();
+  //       const level = res.data?.level;
+  //       if (level === 'Healthy' || level === 'Caution' || level === 'Critical') {
+  //         setLiquidityLevel(level);
+  //       } else {
+  //         setLiquidityLevel(null);
+  //       }
+  //     } catch (error) {
+  //       console.error('Failed to fetch market liquidity:', error);
+  //       setLiquidityLevel(null);
+  //     }
+  //   };
+  //   fetchLiquidity();
+  //   const interval = setInterval(fetchLiquidity, 60000);
+  //   return () => clearInterval(interval);
+  // }, []);
+
   const themeClass = theme === 'light' ? 'light' : 'dark';
 
   return (
@@ -669,7 +735,7 @@ export const XPlatformComponent = () => {
             <div className={`x-platform-token-chart-container ${themeClass}`}>
               <div className={`x-platform-token-chart relative ${themeClass}`}>
                 <div className={`x-platform-token-chart-img ${themeClass}`}>
-                  <img src={greenLight} alt="Green Light" style={{ width: 54, height: 90 }} />
+                  <LiquidTube level={liquidityLevel} className="liquid-tube-svg-wrapper" />
                 </div>
                 <div className="flex flex-1 items-end justify-end gap-[1vh]">
                   {/* <div className={`flex items-center justify-center rounded-[8px] p-[1vh] ${themeClass === 'light' ? 'bg-[#F8FFDC]' : 'bg-[#2E3A21]'}`}>
@@ -697,7 +763,15 @@ export const XPlatformComponent = () => {
                       <div
                         className={`x-card-box py-[10px]flex h-[50px] w-full flex-col items-center justify-center rounded-[8px] px-[14px] ${themeClass}`}>
                         <div className="whitespace-nowrap text-center text-[12px]">Liquidity Status</div>
-                        <div className="text-center text-[13px] font-bold">-</div>
+                        <div className="text-center text-[13px] font-bold">
+                          {liquidityLevel === 'Healthy'
+                            ? 'Excellent'
+                            : liquidityLevel === 'Caution'
+                              ? 'Warning'
+                              : liquidityLevel === 'Critical'
+                                ? 'Critical'
+                                : '-'}
+                        </div>
                       </div>
                     </div>
                   </div>
