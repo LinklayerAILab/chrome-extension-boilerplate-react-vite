@@ -371,6 +371,34 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
   }
 };
 
+// 模块级开关：防止账户切换时 accountsChanged 事件与 2s 轮询并发触发重复登录
+let accountSwitchInProgress = false;
+
+// 检测到钱包账户切换时，自动用新账户重新走 SIWE 登录
+// 成功时 setUserInfo 会直接覆盖旧 token/address（不调用后端 logout）
+const handleAccountSwitch = async (newAddress: string, providerId?: string | null): Promise<void> => {
+  const loggedInAddress = store.getState().user.address;
+  // 相同账户（忽略 checksum 大小写差异）无需重新登录
+  if (loggedInAddress && loggedInAddress.toLowerCase() === newAddress.toLowerCase()) {
+    return;
+  }
+
+  if (accountSwitchInProgress) {
+    return;
+  }
+  accountSwitchInProgress = true;
+  try {
+    const ok = await handleSiweLogin(newAddress, providerId ?? undefined);
+    if (!ok) {
+      // 重新签名失败（用户拒绝/取消）→ 仅本地清会话回到登录页，保持钱包已连接，用户可再次点击连接
+      store.dispatch(logoutAction());
+      message.warning('Signature cancelled. Please sign in again with the new account.');
+    }
+  } finally {
+    accountSwitchInProgress = false;
+  }
+};
+
 // 内部内容组件 - 使用本地状态管理
 const SidePanelContentInner = () => {
   // 使用本地状态而不是 Wagmi hooks
@@ -550,6 +578,9 @@ const SidePanelContentInner = () => {
                   lastConnected: Date.now(),
                   providerId: newProviderId || undefined,
                 });
+
+                // 账户切换后自动用新账户重新登录
+                await handleAccountSwitch(currentAccounts[0], savedState.providerId);
               } else {
                 console.log('[App] Connection verified successfully ✅');
               }
@@ -588,6 +619,9 @@ const SidePanelContentInner = () => {
           } else if (walletAddress && currentAccounts[0].toLowerCase() !== walletAddress.toLowerCase()) {
             console.log('[App] Sidebar opened: Account changed, updating...');
             setWalletAddress(currentAccounts[0]);
+
+            // 账户切换后自动用新账户重新登录
+            await handleAccountSwitch(currentAccounts[0], providerId);
           }
         }
       } else if (request.type === 'WALLET_EVENT_FORWARD') {
@@ -621,6 +655,9 @@ const SidePanelContentInner = () => {
                 lastConnected: Date.now(),
                 providerId: currentProviderId || undefined,
               });
+
+              // 账户切换后自动用新账户重新登录
+              await handleAccountSwitch(newAddress, providerId);
             } else {
               // 用户断开连接（锁定钱包等）
               console.log('[App] Accounts changed to empty, disconnecting...');
@@ -705,7 +742,7 @@ const SidePanelContentInner = () => {
 
     chrome.runtime.onMessage.addListener(handleMessage);
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
-  }, [isConnected, walletAddress, chainId, manuallyDisconnected]);
+  }, [isConnected, walletAddress, chainId, manuallyDisconnected, providerId]);
 
   // 定期检查钱包连接状态（兜底方案）
   useEffect(() => {
@@ -775,6 +812,9 @@ const SidePanelContentInner = () => {
               lastConnected: Date.now(),
               providerId: newProviderId || undefined,
             });
+
+            // 账户切换后自动用新账户重新登录
+            await handleAccountSwitch(currentAddress, providerId);
           }
         }
         // ❌ 移除自动连接逻辑 - 不要在未连接时自动连接
