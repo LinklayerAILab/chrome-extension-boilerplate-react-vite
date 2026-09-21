@@ -306,7 +306,7 @@ export const Popover = ({
               ...popoverStyle,
               visibility: isPositioned ? 'visible' : 'hidden',
             }}
-            className="relative max-w-lg rounded-lg bg-white p-4 shadow-xl"
+            className="relative max-w-lg rounded-lg border border-[#999999] bg-white p-4 shadow-xl shadow-black/30"
             onMouseDown={event => event.stopPropagation()}
             onClick={event => event.stopPropagation()}>
             {/* <div className={getArrowClass()} /> */}
