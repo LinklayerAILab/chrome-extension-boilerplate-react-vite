@@ -8,10 +8,6 @@ interface SocialBtnsProps {
 
 export const SocialBtns = ({ onMenuSelect }: SocialBtnsProps) => {
   const socialButtons = [
-    {
-      icon: 'money.svg',
-      value: 1,
-    },
     // {
     //   icon: 'invite.svg',
     //   value: 2,

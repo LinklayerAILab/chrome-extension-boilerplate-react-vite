@@ -1,9 +1,20 @@
 import axios, { AxiosError } from 'axios';
 import { ACCESS_TOKEN_KEY, ADDRESS_KEY } from '@src/lib/storageKeys';
-import { store } from '@src/store';
-import { setIsLogin } from '@src/store/slices/userSlice';
-import { setSidePanelOpen, setSelectedMenuId } from '@src/store/slices/uiSlice';
+import { handleUnauthorizedSession } from '@src/lib/sessionCleanup';
 import { API_BASE_URL } from './config';
+
+/** 业务错误：在 Error 上附加响应体中的 code / data（如 Stripe 6006 恢复支付需要读取） */
+export type ApiError = Error & { code?: number; data?: unknown };
+
+const toApiError = (
+  body: { code?: number; message?: string; msg?: string; data?: unknown } | undefined,
+  fallbackMsg: string,
+): ApiError => {
+  const err = new Error(body?.message || body?.msg || fallbackMsg) as ApiError;
+  if (body?.code !== undefined) err.code = body.code;
+  if (body?.data !== undefined) err.data = body.data;
+  return err;
+};
 
 export const service = axios.create({
   baseURL: API_BASE_URL,
@@ -53,8 +64,12 @@ service.interceptors.response.use(
     if (response.status !== 200) {
       return Promise.reject(response);
     }
+    // 兼容后端 HTTP 200 + body {code: 401} 的过期场景，同样触发完整会话清理
+    if (response.data?.code === 401) {
+      handleUnauthorizedSession();
+    }
     if (response.data?.code !== 0) {
-      return Promise.reject(new Error(response.data?.message || 'Request failed'));
+      return Promise.reject(toApiError(response.data, 'Request failed'));
     }
     return response.data;
   },
@@ -62,14 +77,10 @@ service.interceptors.response.use(
     const data = error.response?.data as { code?: number; message?: string } | undefined;
     // 只处理 401 错误，其他错误构造 Error 对象抛出
     if (data?.code === 401 || error.response?.status === 401) {
-      store.dispatch(setIsLogin(false));
-      store.dispatch(setSidePanelOpen(false));
-      store.dispatch(setSelectedMenuId(1));
-      window.dispatchEvent(new Event('unauthorized'));
-      window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+      handleUnauthorizedSession();
     }
 
     const msg = data?.message || error.message || 'Network error';
-    return Promise.reject(new Error(msg));
+    return Promise.reject(toApiError(data, msg));
   },
 );

@@ -5,9 +5,19 @@ import { useI18n } from '@src/lib/i18n';
 import { Button, message } from '@src/ui';
 import { query_tasks } from '@src/api/agent_c';
 import type { QueryTasksItem, QueryTasksParams, QueryTasksResponse, QueryTasksType } from '@src/api/agent_c';
+import { stripe_checkout, savePendingOrder, STRIPE_ERROR_CODES, PACKAGE_BY_LIST_VALUE } from '@src/api/stripe';
+import type { StripeCheckoutData } from '@src/api/stripe';
 import { usePageInfoUpdate } from '@src/lib/hooks/usePageInfoUpdate';
-import { getPayConfig, switchBscChain, getTokenBalance, executeTransfer } from '../lib/payment';
+import {
+  getPayConfig,
+  switchBscChain,
+  getTokenBalance,
+  executeTransfer,
+  executeViaBackgroundScript,
+} from '../lib/payment';
+import { getLastProviderId } from '../lib/walletStorage';
 import { parseUnits } from 'viem';
+import { StripeResult } from './StripeResult';
 const bookIcon = chrome.runtime.getURL('content-ui/points/book.svg');
 const percent12 = chrome.runtime.getURL('content-ui/points/12percent.svg');
 const percent20 = chrome.runtime.getURL('content-ui/points/20percent.svg');
@@ -31,6 +41,8 @@ interface PointsProps {
   walletAddress?: string;
   providerId?: string;
   walletChainId?: string;
+  // 钱包重连成功后同步回 App（App 是钱包状态的唯一写者）
+  onWalletReconnected?: (state: { address: string; chainId: string | null; providerId?: string }) => void;
 }
 
 // 日期格式化函数
@@ -82,6 +94,7 @@ export const Points = ({
   walletAddress = '',
   providerId = '',
   walletChainId = '',
+  onWalletReconnected,
 }: PointsProps) => {
   const { t, locale } = useI18n();
   usePageInfoUpdate('points', locale);
@@ -126,6 +139,20 @@ export const Points = ({
       icon: chrome.runtime.getURL('content-ui/points/usdc.svg'),
       disabled: false,
     },
+    {
+      label: t.myPoints?.stripe?.cardLabel ?? 'Card',
+      value: 'stripe',
+      select: false,
+      icon: chrome.runtime.getURL('content-ui/points/card.svg'),
+      disabled: false,
+    },
+    {
+      label: 'LLA',
+      value: 'lla',
+      select: false,
+      icon: chrome.runtime.getURL('content-ui/points/lla.svg'),
+      disabled: true,
+    },
   ]);
 
   const [listLoading, setListLoading] = useState(true);
@@ -138,6 +165,9 @@ export const Points = ({
 
   // 支付状态
   const [payLoading, setPayLoading] = useState(false);
+
+  // Stripe 支付结果视图（仅发起支付/6006 恢复的那一次会话内展示，下次进入直接是 Points 页）
+  const [showStripeResult, setShowStripeResult] = useState(false);
 
   // 等待确认提示（使用 message.loading）
   const waitingMsgRef = useRef<(() => void) | null>(null);
@@ -209,47 +239,177 @@ export const Points = ({
     );
   };
 
+  // 在新标签页打开 Stripe 托管收银台：优先 background chrome.tabs.create
+  // （不受弹窗拦截，也避开 content script 中 await 后丢失用户激活手势的问题），
+  // 失败时退回 window.open，两条路径都失败则提示允许弹窗。
+  const openCheckoutTab = (url: string) => {
+    chrome.runtime.sendMessage({ type: 'OPEN_URL', url }, response => {
+      if (chrome.runtime.lastError || !response?.success) {
+        const win = window.open(url, '_blank', 'noopener');
+        if (!win) {
+          message.warning(t.myPoints?.stripe?.popupBlocked ?? 'The payment page could not be opened.');
+        }
+      }
+    });
+  };
+
+  // Stripe 托管 Checkout：创建会话后新标签页打开收银台，侧边窗切换到轮询结果视图。
+  // 卡片支付无需钱包连接。
+  const handleStripePay = async () => {
+    if (payLoading) return;
+
+    if (!isLogin) {
+      message.error(t.common?.pleaseLogin ?? 'Please log in first');
+      return;
+    }
+
+    const selectedItem = list.find(item => item.select);
+    if (!selectedItem) {
+      message.warning(t.common?.select ?? 'Please select a package');
+      return;
+    }
+    const packageType = PACKAGE_BY_LIST_VALUE[selectedItem.value];
+
+    setPayLoading(true);
+    try {
+      const res = await stripe_checkout(packageType);
+      await savePendingOrder({
+        order_no: res.data.order_no,
+        package_type: packageType,
+        created_at: Math.floor(Date.now() / 1000),
+      });
+      openCheckoutTab(res.data.checkout_url);
+      setShowStripeResult(true);
+    } catch (err) {
+      const e = err as { code?: number; message?: string; data?: StripeCheckoutData };
+      if (e.code === STRIPE_ERROR_CODES.NOT_ENABLED) {
+        message.warning(t.myPoints?.stripe?.notAvailable ?? 'Card payment is not available yet.');
+        // 禁用卡片选项并回退 USDT（与 web 端行为一致）
+        setCoinList(prev => {
+          const next = prev.map(it => (it.value === 'stripe' ? { ...it, disabled: true, select: false } : it));
+          if (!next.some(it => it.select && !it.disabled)) {
+            return next.map(it => ({ ...it, select: it.value === 'usdt' }));
+          }
+          return next;
+        });
+      } else if (e.code === STRIPE_ERROR_CODES.INVALID_PACKAGE) {
+        message.error(t.myPoints?.stripe?.invalidPackage ?? 'Invalid package selected.');
+      } else if (e.code === STRIPE_ERROR_CODES.UPSTREAM_ERROR) {
+        message.error(t.myPoints?.stripe?.upstreamError ?? 'Payment service is temporarily unavailable.');
+      } else if (e.code === STRIPE_ERROR_CODES.PENDING_LIMIT) {
+        // 6006：后端在 data 中返回同套餐已有挂单 - 恢复其支付
+        const conflict = e.data;
+        if (conflict?.order_no && conflict.checkout_url) {
+          await savePendingOrder({
+            order_no: conflict.order_no,
+            package_type: packageType,
+            created_at: Math.floor(Date.now() / 1000),
+          });
+          message.info(t.myPoints?.stripe?.resumingPayment ?? 'Opening the existing payment page...');
+          openCheckoutTab(conflict.checkout_url);
+          setShowStripeResult(true);
+          return;
+        }
+        message.error(t.myPoints?.stripe?.pendingLimit ?? 'You have too many unfinished orders.');
+      } else if (e.code === 429) {
+        message.warning(t.myPoints?.stripe?.tooManyRequests ?? 'Too many requests. Please wait a moment.');
+      } else {
+        message.error(e.message || t.common?.transactionFailed || 'Request failed');
+      }
+    } finally {
+      // 与 web 端不同：侧边窗不会因跳转而卸载，按钮必须复位
+      setPayLoading(false);
+    }
+  };
+
   // 支付处理
   const handlePay = async () => {
+    // Stripe 分支必须先于钱包检查 - 卡片支付无需钱包
+    const payCoin = coinList.find(item => item.select);
+    if (payCoin?.value === 'stripe') {
+      await handleStripePay();
+      return;
+    }
+
     const selectedItem = list.find(item => item.select);
     if (!selectedItem) {
       message.warning(t.common?.select ?? 'Please select a package');
       return;
     }
 
-    // 如果 props 中没有钱包状态，尝试从 storage 读取作为兜底
+    // 如果 props 中没有钱包状态（钱包锁定/状态被轮询清空），尝试恢复连接
     let effectiveWalletConnected = walletConnected;
     let effectiveWalletAddress = walletAddress;
     let effectiveProviderId = providerId;
     let effectiveWalletChainId = walletChainId;
 
     if (!walletConnected || !walletAddress) {
+      setPayLoading(true);
       try {
-        // 尝试通过 background script 获取当前账户
-        const accounts = await chrome.runtime.sendMessage({ type: 'WEB3_REQUEST', method: 'eth_accounts', args: [] });
-        if (accounts?.result && accounts.result.length > 0) {
-          effectiveWalletConnected = true;
-          effectiveWalletAddress = accounts.result[0];
-          // 获取 chainId 和 providerId
-          const chainIdResult = await chrome.runtime.sendMessage({
-            type: 'WEB3_REQUEST',
-            method: 'eth_chainId',
-            args: [],
-          });
-          effectiveWalletChainId = chainIdResult?.result || walletChainId;
-          const providerIdResult = await new Promise<any>((resolve, reject) => {
-            chrome.runtime.sendMessage({ type: 'GET_PROVIDER_ID' }, resolve);
-          });
-          effectiveProviderId = providerIdResult?.result || providerId;
-          console.log('[Points] Recovered wallet state from storage:', {
-            effectiveWalletConnected,
+        // 定位用户最后使用的钱包（优先 prop，其次跨锁定存活的 LAST_PROVIDER_KEY）
+        const pid = providerId || (await getLastProviderId()) || undefined;
+
+        // 被动检查：provider 解析的账户查询，可静默恢复仅 React 状态丢失的场景
+        try {
+          const accounts = (await executeViaBackgroundScript('wallet_getAccounts', [pid])) as string[];
+          if (accounts?.length > 0) {
+            effectiveWalletConnected = true;
+            effectiveWalletAddress = accounts[0];
+          }
+        } catch (error) {
+          console.warn('[Points] Passive account check failed:', error);
+        }
+
+        // 主动唤起：弹出钱包自身的解锁/连接窗口（eth_requestAccounts）
+        if (!effectiveWalletConnected || !effectiveWalletAddress) {
+          const hideLoading = message.loading(t.myPoints?.walletReconnecting ?? 'Reconnecting wallet...', 0);
+          try {
+            const accounts = (await executeViaBackgroundScript('wallet_requestAccounts', [pid])) as string[];
+            if (accounts?.length > 0) {
+              effectiveWalletConnected = true;
+              effectiveWalletAddress = accounts[0];
+            }
+          } catch (error: any) {
+            const rejected =
+              error?.code === 4001 ||
+              error?.message?.includes('User rejected') ||
+              error?.message?.includes('User denied');
+            if (rejected) {
+              message.warning(t.myPoints?.reconnectCancelled ?? 'Wallet connection cancelled');
+            } else {
+              message.error(
+                `${t.myPoints?.reconnectFailed ?? 'Failed to reconnect wallet'}: ${error?.message ?? 'unknown'}`,
+              );
+            }
+            return;
+          } finally {
+            hideLoading();
+          }
+          message.success(t.myPoints?.walletReconnected ?? 'Wallet reconnected');
+        }
+
+        // 恢复 chainId 并同步回 App（保持轮询/事件状态一致）
+        if (effectiveWalletConnected && effectiveWalletAddress) {
+          try {
+            const chainId = (await executeViaBackgroundScript('wallet_getChainId', [pid])) as string;
+            effectiveWalletChainId = chainId || walletChainId;
+          } catch {
+            effectiveWalletChainId = walletChainId;
+          }
+          effectiveProviderId = pid || effectiveProviderId;
+          console.log('[Points] Wallet reconnected:', {
             effectiveWalletAddress,
             effectiveProviderId,
             effectiveWalletChainId,
           });
+          onWalletReconnected?.({
+            address: effectiveWalletAddress,
+            chainId: effectiveWalletChainId,
+            providerId: pid,
+          });
         }
-      } catch (error) {
-        console.warn('[Points] Failed to recover wallet state:', error);
+      } finally {
+        setPayLoading(false);
       }
     }
 
@@ -389,6 +549,10 @@ export const Points = ({
 
   const pointerIcon = chrome.runtime.getURL('content-ui/points/money.svg');
   const rightIcon = chrome.runtime.getURL('content-ui/points/success.svg');
+
+  if (showStripeResult) {
+    return <StripeResult onBack={() => setShowStripeResult(false)} />;
+  }
 
   return (
     <div className="flex flex-col gap-4 text-black">

@@ -34,7 +34,7 @@ import { setSelectedMenuId, setSidePanelOpen } from '@src/store/slices/uiSlice';
 import { LoginPanel } from './components/LoginPanel';
 import { SiweMessage } from 'siwe';
 import { getAddress } from 'viem';
-import { getSiweNonce, verifySiweMessage } from '@src/api/user';
+import { getSiweNonce, validate_token, verifySiweMessage } from '@src/api/user';
 import { get_user_info } from '@src/api/agent_c';
 import { autoConfirmPendingClaims } from './lib/claimLlax';
 import { API_BASE_URL } from '@src/api/config';
@@ -598,6 +598,13 @@ const SidePanelContentInner = () => {
     };
 
     loadWalletState();
+
+    // 挂载时确定性验证登录 token：服务端过期（约 24h）立即触发清理，而非等随机 API 401
+    if (window.localStorage.getItem(ACCESS_TOKEN_KEY)) {
+      validate_token().catch(() => {
+        // 网络失败不登出（离线场景）；401 由 service 拦截器统一清理
+      });
+    }
   }, []);
 
   // 监听钱包事件
@@ -901,6 +908,29 @@ const SidePanelContentInner = () => {
     }
   }, [handleDisconnect]);
 
+  // Points 兜底重连成功后同步钱包状态（App 是钱包状态的唯一写者）
+  const handleWalletReconnected = useCallback(
+    async (state: { address: string; chainId: string | null; providerId?: string }) => {
+      setWalletAddress(state.address);
+      setChainId(state.chainId);
+      setIsConnected(true);
+      setManuallyDisconnected(false);
+      setProviderId(state.providerId ?? null);
+
+      await WalletStorage.saveWalletState({
+        isConnected: true,
+        address: state.address,
+        chainId: state.chainId,
+        lastConnected: Date.now(),
+        providerId: state.providerId,
+      });
+
+      // 解锁后若活动账户变化，自动用新账户重跑 SIWE 登录（同账户时 no-op）
+      await handleAccountSwitch(state.address, state.providerId);
+    },
+    [],
+  );
+
   // Popover 打开时同步用户数据和积分
   const handlePopoverOpenChange = useCallback(async (open: boolean) => {
     // 只在打开时同步数据
@@ -994,6 +1024,7 @@ const SidePanelContentInner = () => {
             walletAddress={walletAddress || ''}
             providerId={providerId || ''}
             walletChainId={chainId || ''}
+            onWalletReconnected={handleWalletReconnected}
           />
         )}
       </PageLayout>

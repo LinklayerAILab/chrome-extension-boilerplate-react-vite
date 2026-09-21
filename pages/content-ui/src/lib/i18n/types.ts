@@ -145,6 +145,8 @@ export interface LocaleMessages {
     myPoints: string;
     myInvite: string;
     connectFirst: string;
+    /** 钱包实际已断开时地址行的提示 */
+    walletDisconnected: string;
   };
   alpha: {
     myAlphaHolding: string;
@@ -249,6 +251,38 @@ export interface LocaleMessages {
     pointsRecord: string;
     points: string;
     waitingConfirmation: string;
+    /** 钱包重连流程（锁定/断开后点击充值时触发） */
+    walletReconnecting: string;
+    walletReconnected: string;
+    reconnectCancelled: string;
+    reconnectFailed: string;
+    stripe: {
+      cardLabel: string;
+      notAvailable: string;
+      invalidPackage: string;
+      upstreamError: string;
+      pendingLimit: string;
+      resumingPayment: string;
+      tooManyRequests: string;
+      /** 扩展特有：background 与 window.open 两条开标签路径均失败时提示 */
+      popupBlocked: string;
+    };
+  };
+  stripeResult: {
+    confirming: string;
+    confirmingDesc: string;
+    success: string;
+    /** 含 {{points}} / {{llax}} 占位符，组件内手动插值 */
+    successDesc: string;
+    cancelled: string;
+    cancelledDesc: string;
+    timeout: string;
+    timeoutDesc: string;
+    notFound: string;
+    notFoundDesc: string;
+    backToPoints: string;
+    retry: string;
+    refresh: string;
   };
   invite: {
     shareTitle: string;

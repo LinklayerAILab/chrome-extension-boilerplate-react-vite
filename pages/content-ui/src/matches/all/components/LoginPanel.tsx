@@ -70,7 +70,6 @@ export const LoginPanel = ({
   const email = chrome.runtime.getURL('content-ui/loginPanel/email.svg');
   const smallMoney = chrome.runtime.getURL('content-ui/smallMoney.svg');
   const smallPeople = chrome.runtime.getURL('content-ui/smallPeople.svg');
-  const address = useSelector((state: RootState) => state.user.address);
   const otherInfo = useSelector((state: RootState) => state.user.otherInfo);
   const [llaxBalance, setLlaxBalance] = useState<LLAxBalanceData['balance'] | null>(null);
   const [claimLoading, setClaimLoading] = useState(false);
@@ -86,13 +85,13 @@ export const LoginPanel = ({
   };
 
   const handleClaim = async () => {
-    if (!address) {
+    if (!isConnected || !walletAddress) {
       message.warning(t.loginPanel?.connectFirst ?? 'Please connect your wallet first');
       return;
     }
     if (claimLoading) return;
 
-    const claimAddress = address;
+    const claimAddress = walletAddress;
     const claimChainId = walletChainId || '';
     const claimProviderId = providerId || '';
 
@@ -318,13 +317,19 @@ export const LoginPanel = ({
             </div>
             <div>
               <div className="text-[12px] text-[#666666]">{t.loginPanel?.evmAddress || 'EVM Address'}</div>
-              <div className="text-[12px] font-bold text-black" title={address}>
-                {formatAddress(address, 14, 10)}
-              </div>
+              {isConnected && walletAddress ? (
+                <div className="text-[12px] font-bold text-black" title={walletAddress}>
+                  {formatAddress(walletAddress, 14, 10)}
+                </div>
+              ) : (
+                <div className="text-[12px] font-bold text-[#999999]">
+                  {t.loginPanel?.walletDisconnected ?? 'Wallet disconnected. Reconnect to continue.'}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex flex-1 items-center justify-end">
-            <Copy text={address}></Copy>
+            <Copy text={isConnected && walletAddress ? walletAddress : ''}></Copy>
           </div>
         </div>
         <div className="h-[52px] rounded-[8px] bg-[#F2F2F2] px-2 py-3">

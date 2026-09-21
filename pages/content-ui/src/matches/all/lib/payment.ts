@@ -67,7 +67,7 @@ const normalizeWeb3ErrorMessage = (errorInput: unknown): string => {
 };
 
 // 通过 Background Script 在页面上下文执行 eth_* 调用
-const executeViaBackgroundScript = async (method: string, args: any[] = []): Promise<any> => {
+export const executeViaBackgroundScript = async (method: string, args: any[] = []): Promise<any> => {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ type: 'WEB3_REQUEST', method, args }, response => {
       if (chrome.runtime.lastError) {

@@ -52,12 +52,12 @@ export const Menus = ({ store }: MenusProps) => {
       icon: ICONS.POLIET,
       selectIcon: ICONS.POLIET_SELECT,
     },
-    // {
-    //   id: 6,
-    //   title: t.menus?.points || 'Points',
-    //   icon: ICONS.POINTS,
-    //   selectIcon: ICONS.POINTS_SELECT,
-    // },
+    {
+      id: 6,
+      title: t.menus?.points || 'Points',
+      icon: ICONS.POINTS,
+      selectIcon: ICONS.POINTS_SELECT,
+    },
   ];
 
   const handleSelect = (id: number) => {

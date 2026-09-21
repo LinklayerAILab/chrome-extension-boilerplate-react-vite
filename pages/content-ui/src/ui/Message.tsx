@@ -5,11 +5,11 @@ import { classNames } from './utils';
 export type MessageType = 'success' | 'info' | 'warning' | 'error' | 'loading';
 
 export interface MessageInstance {
-  success: (content: ReactNode, duration?: number) => void;
-  error: (content: ReactNode, duration?: number) => void;
-  info: (content: ReactNode, duration?: number) => void;
-  warning: (content: ReactNode, duration?: number) => void;
-  loading: (content: ReactNode, duration?: number) => void;
+  success: (content: ReactNode, duration?: number) => () => void;
+  error: (content: ReactNode, duration?: number) => () => void;
+  info: (content: ReactNode, duration?: number) => () => void;
+  warning: (content: ReactNode, duration?: number) => () => void;
+  loading: (content: ReactNode, duration?: number) => () => void;
 }
 
 const messageContainerId = 'content-ui-message-container';

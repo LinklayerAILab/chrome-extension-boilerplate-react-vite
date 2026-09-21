@@ -111,6 +111,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => sendResponse({ ok: false, error: error.message || String(error) }));
     return true;
   }
+  if (request.type === 'OPEN_URL') {
+    // 在新标签页打开外部页面（如 Stripe 托管收银台）。content script 中
+    // await 之后的 window.open 会丢失用户激活手势、可能被弹窗拦截，
+    // background 的 chrome.tabs.create 则不受限制。
+    const { url } = request;
+    if (typeof url === 'string' && /^https:\/\//.test(url)) {
+      chrome.tabs
+        .create({ url, active: true })
+        .then(() => sendResponse({ success: true }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+    } else {
+      sendResponse({ success: false, error: 'Invalid URL' });
+    }
+    return true; // 异步响应
+  }
   if (request.type === 'WEB3_REQUEST') {
     handleWeb3Request(request, sender)
       .then(sendResponse)
@@ -500,11 +515,12 @@ async function handleWeb3Request(request: any, sender: chrome.runtime.MessageSen
             }
             try {
               if (typeof provider.request === 'function') {
-                const result = await requestWithTimeout(provider.request({ method: 'eth_requestAccounts' }));
+                // 钱包解锁/连接弹窗常超过默认 12s（用户需输入密码），单独放宽
+                const result = await requestWithTimeout(provider.request({ method: 'eth_requestAccounts' }), 60000);
                 return { success: true, result };
               }
               if (typeof provider.send === 'function') {
-                const result = await requestWithTimeout(provider.send('eth_requestAccounts', []));
+                const result = await requestWithTimeout(provider.send('eth_requestAccounts', []), 60000);
                 return { success: true, result };
               }
               if (typeof (provider as any).enable === 'function') {
