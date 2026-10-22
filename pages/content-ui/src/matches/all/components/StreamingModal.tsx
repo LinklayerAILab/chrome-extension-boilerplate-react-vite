@@ -203,15 +203,18 @@ const StreamingModal = memo(({ isOpen, onClose, type, query, coinSymbol, title, 
       return;
     }
 
-    // 🔥 关键修复：从 Redux store 获取最新的积分值，而不是使用闭包中的旧值
-    const currentPoints = store.getState().user.points;
-    console.log('[StreamingModal] Current points:', currentPoints);
+    // liquidity_check（Guard 套餐赠送服务）不校验积分；analyse / recommend 仍按积分计费
+    if (type !== 'liquidity_check') {
+      // 🔥 关键修复：从 Redux store 获取最新的积分值，而不是使用闭包中的旧值
+      const currentPoints = store.getState().user.points;
+      console.log('[StreamingModal] Current points:', currentPoints);
 
-    // 检查积分是否足够
-    if (currentPoints < 10) {
-      message.warning(labels.notEnoughPoints);
-      onClose();
-      return;
+      // 检查积分是否足够
+      if (currentPoints < 10) {
+        message.warning(labels.notEnoughPoints);
+        onClose();
+        return;
+      }
     }
 
     if (streamAbortController.current) {

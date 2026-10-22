@@ -1,8 +1,8 @@
 export const PageLayout = ({ children, header }: { children: React.ReactNode; header?: React.ReactNode }) => (
-  <div className="flex flex-col gap-[1vh]">
-    <div className="h-[140px] bg-[#cf0] p-4">{header}</div>
+  <div className="flex h-full min-h-0 flex-col gap-[1vh]">
+    <div className="h-[140px] shrink-0 bg-[#cf0] p-4">{header}</div>
     <div
-      className="custom-scrollbar-light h-[calc(100vh-140px)] w-[432px] overflow-y-auto pl-[16px] pr-[16px]"
+      className="custom-scrollbar-light min-h-0 w-[432px] flex-1 overflow-y-auto pb-2 pl-[16px] pr-[16px]"
       style={{
         scrollbarWidth: 'thin',
         scrollbarColor: '#ccc #f1f5f9', // Firefox: thumb color, track color (slate-300, slate-100)

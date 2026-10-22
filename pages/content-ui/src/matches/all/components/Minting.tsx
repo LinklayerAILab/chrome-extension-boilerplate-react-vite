@@ -257,7 +257,7 @@ export const Minting = () => {
 
   return (
     <div className="mt-[10px] flex flex-col gap-4 text-black">
-      <PlatformList />
+      <PlatformList showCoins={false} />
 
       <div
         className="relative mt-[14px] h-auto w-full rounded-[8px] bg-[#ebebeb] p-[14px] lg:bg-[#fff] lg:p-0"

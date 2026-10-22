@@ -36,8 +36,8 @@ const defaultInitialState: PageInfoState = {
     description: 'Monitor and analyze your live perps exposure',
   },
   poliet: {
-    title: 'Picker Agent',
-    description: 'Analyze Binance spot and futures markets',
+    title: 'Watch Agent',
+    description: 'Watch tokens and get daily liquidity health reports',
   },
   points: {
     title: 'Points',

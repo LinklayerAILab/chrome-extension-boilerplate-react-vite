@@ -5,9 +5,11 @@ interface DialogProps {
   isOpen: boolean;
   onClose: () => void;
   children: ReactNode;
+  /** 覆盖面板尺寸/内边距（默认 w-[92vw] max-w-[400px] rounded-[12px] p-[16px]） */
+  panelClassName?: string;
 }
 
-const Dialog = ({ isOpen, onClose, children }: DialogProps) => {
+const Dialog = ({ isOpen, onClose, children, panelClassName }: DialogProps) => {
   // 获取 layout-box 元素
   const [layoutBox, setLayoutBox] = useState<HTMLElement | null>(null);
   const observerRef = useRef<MutationObserver | null>(null);
@@ -128,7 +130,9 @@ const Dialog = ({ isOpen, onClose, children }: DialogProps) => {
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-[10001] w-[92vw] max-w-[400px] rounded-[12px] bg-white p-[16px] shadow-2xl">
+        className={
+          panelClassName || 'relative z-[10001] w-[92vw] max-w-[400px] rounded-[12px] bg-white p-[16px] shadow-2xl'
+        }>
         {children}
       </div>
     </div>

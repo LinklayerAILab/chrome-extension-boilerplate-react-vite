@@ -1,219 +1,96 @@
-import { useState, useEffect, ReactNode, memo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import type { RootState, AppDispatch } from '@src/store';
+import { memo, useCallback, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '@src/store';
 import { useI18n } from '@src/lib/i18n';
-import { Input, message } from '@src/ui';
-import StreamingModal from './StreamingModal';
-import TendBox from './TendBox';
-import CoinList from './CoinList';
 import { setPageInfo } from '@src/store/slices/pageInfoSlice';
-import { syncPoints } from '@src/store/slices/userSlice';
-import { store } from '@src/store';
 import { usePageInfoUpdate } from '@src/lib/hooks/usePageInfoUpdate';
-import { CoinHeader } from './CoinHeader';
-import { StrategyHeader } from './StrategyHeader';
-import { TrackerHeader } from './TrackerHeader';
+import { AddWatchTab } from './AddWatchTab';
+import { WatchListTab } from './WatchListTab';
+import { DailyReportTab } from './DailyReportTab';
+import { GuardEntitlementBar } from './GuardEntitlementBar';
 
-interface TabItem {
-  id: number;
-  title: string;
-  select: boolean;
-}
+type TabId = 1 | 2 | 3;
 
-// 兼容 TendBox 的 StrategyItem 类型 (label: ReactNode)
-interface TendBoxStrategyItem {
-  label: React.ReactNode;
-  value: string;
-}
-
-type StreamingType = 'analyse' | 'recommend' | null;
-
+/**
+ * Politer（Piloter）模块：合并 bodyguard-app 三模块为 tab 切换。
+ * 1 = Add Watch（搜索代币 + 关注）
+ * 2 = Watch List（关注列表 + 健康灯球卡片）
+ * 3 = Daily Report（AI 日报 SSE 流）
+ * 仅渲染当前 tab：切换即重挂载刷新，替代 bodyguard 的 React Query 缓存联动。
+ */
 export const Politer = memo(() => {
   const { t, locale } = useI18n();
   usePageInfoUpdate('poliet', locale);
   const tAny = t as unknown as Record<string, any>;
   const dispatch = useDispatch<AppDispatch>();
-  const isLogin = useSelector((state: RootState) => state.user?.isLogin ?? false);
   const isOpen = useSelector((state: RootState) => state.ui.isSidePanelOpen);
 
-  const [btns, setBtns] = useState<TabItem[]>([
-    { id: 1, title: 'Picker', select: true },
-    { id: 2, title: 'Tracker', select: false },
-  ]);
+  const [activeTab, setActiveTab] = useState<TabId>(1);
 
-  // 当翻译加载完成后更新按钮文本
-  useEffect(() => {
-    setBtns([
-      { id: 1, title: t.agent?.picker || 'Picker', select: btns[0]?.select ?? true },
-      { id: 2, title: t.agent?.tracker || 'Tracker', select: btns[1]?.select ?? false },
-    ]);
-  }, [t]);
+  const tabs: Array<{ id: TabId; title: string; desc: string }> = [
+    {
+      id: 1,
+      title: tAny?.guard?.addWatch || 'Add watch',
+      desc: tAny?.guard?.addWatchDesc || 'Search and watch Binance tokens',
+    },
+    {
+      id: 2,
+      title: tAny?.guard?.watchList || 'Watch List',
+      desc: tAny?.guard?.watchListDesc || 'Liquidity health for every watched token',
+    },
+    {
+      id: 3,
+      title: tAny?.guard?.dailyReport || 'Daily',
+      desc:
+        tAny?.guard?.dailyReportDesc ||
+        'Health check on every coin you watch, delivered at 02:00 daily — calm days included.',
+    },
+  ];
 
-  const [searchStr, setSearchStr] = useState<string>('');
-  const [streamingModal, setStreamingModal] = useState<{
-    isOpen: boolean;
-    type: StreamingType;
-    query: string;
-    coinSymbol?: string;
-    title?: ReactNode;
-  }>({
-    isOpen: false,
-    type: null,
-    query: '',
-  });
-
-  const selectId = btns.find(btn => btn.select)?.id ?? null;
-
-  const handleClick = (btn: TabItem) => {
-    setBtns(btns.map(b => ({ ...b, select: b.id === btn.id })));
-    if (btn.id === 1) {
-      dispatch(
-        setPageInfo({
-          page: 'poliet',
-          info: {
-            title: t.agent?.picker || 'Picker Agent',
-            description: t.agent?.pickerAgentDesc || 'Analyze Binance spot and futures markets',
-          },
-        }),
-      );
-    } else {
-      dispatch(
-        setPageInfo({
-          page: 'poliet',
-          info: {
-            title: t.agent?.tracker || 'Tracker Agent',
-            description: t.agent?.trackerAgentDesc || 'Filter Binance spot tokens by technical indicators',
-          },
-        }),
-      );
-    }
-  };
-
-  const handleSearch = (value: string) => {
-    setSearchStr(value);
-  };
-
-  // 处理币种分析
-  const handleCoinAnalyze = async (symbol: string, coinType: number, logo: string) => {
-    if (!isLogin) {
-      message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
-      return;
-    }
-    await dispatch(syncPoints());
-    const currentPoints = store.getState().user.points;
-    if (currentPoints < 10) {
-      message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
-      return;
-    }
-
-    const typeStr = coinType === 2 ? (tAny?.agent?.contract ?? 'contract') : '';
-    const query = `${tAny?.agent?.analyze ?? 'Analyze'} ${symbol} ${typeStr}`.trim();
-
-    setStreamingModal({
-      isOpen: true,
-      type: 'analyse',
-      query,
-      coinSymbol: symbol,
-      title: (
-        <CoinHeader
-          symbol={symbol}
-          type={coinType === 1 ? 'SPOT' : 'FUTURE'}
-          priceLoop={true}
-          logo={`https://cdn.linklayer.ai/coinimages/${logo}`}
-          tradingUrl={`https://www.binance.com/en/trade/${symbol.split('USDT')[0].toUpperCase()}_USDT?type=spot`}></CoinHeader>
-      ),
-    });
-  };
-
-  // 处理策略分析
-  const handleStrategyAnalyze = async (strategy: TendBoxStrategyItem) => {
-    if (!isLogin) {
-      message.warning(tAny?.common?.pleaseLogin ?? 'Please login first');
-      return;
-    }
-    await dispatch(syncPoints());
-    const currentPoints = store.getState().user.points;
-    if (currentPoints < 10) {
-      message.warning(tAny?.common?.notEnoughPoints ?? 'Points not enough');
-      return;
-    }
-
-    // 将 ReactNode 转换为字符串
-    const labelStr = typeof strategy.label === 'string' ? strategy.label : String(strategy.label);
-    const query = `${labelStr} ${strategy.value}`;
-    setStreamingModal({
-      isOpen: true,
-      type: 'recommend',
-      query,
-      title: <TrackerHeader title={strategy.label} desc={strategy.value}></TrackerHeader>,
-    });
-  };
-
-  // 关闭弹窗
-  const handleCloseModal = () => {
-    setStreamingModal({
-      isOpen: false,
-      type: null,
-      query: '',
-    });
-  };
+  const handleSelectTab = useCallback(
+    (id: TabId) => {
+      setActiveTab(id);
+      const tab = tabs.find(item => item.id === id);
+      if (tab) {
+        dispatch(
+          setPageInfo({
+            page: 'poliet',
+            info: { title: tab.title, description: tab.desc },
+          }),
+        );
+      }
+    },
+    // tabs 由 t 派生，语言切换后随闭包更新
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dispatch, tAny],
+  );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="relative mt-[2vh] flex gap-[10px]">
-        {btns.map(btn => (
+    <div className="flex h-full min-h-0 flex-col gap-2 text-black">
+      {/* 权益横幅挂在 tab 条上方：三个 tab 都可见（Politer 只挂载激活 tab） */}
+      <div className="shrink-0 empty:hidden">
+        <GuardEntitlementBar isOpen={isOpen} />
+      </div>
+      <div className="flex shrink-0 gap-2 overflow-x-auto pb-1">
+        {tabs.map(tab => (
           <button
-            key={btn.id}
-            style={{ fontSize: 12 }}
-            className={`rounded-full px-4 py-2 font-bold ${btn.select ? 'bg-[#cf0] text-black' : 'bg-[#F4FFC8] text-gray-400'}`}
-            onClick={() => handleClick(btn)}>
-            {btn.title}
+            key={tab.id}
+            type="button"
+            className={`shrink-0 rounded-lg border-2 border-black px-3 py-2 text-[12px] font-bold transition-colors ${
+              activeTab === tab.id ? 'bg-[#CCFF00] text-black' : 'bg-white text-black/45 hover:bg-[#F4FFC8]'
+            }`}
+            onClick={() => handleSelectTab(tab.id)}>
+            {tab.title}
           </button>
         ))}
-        {selectId === 1 && (
-          <div className="absolute right-0 w-[180px]">
-            <Input
-              search
-              allowClear
-              value={searchStr}
-              onChange={e => setSearchStr(e.target.value)}
-              onSearch={handleSearch}
-              placeholder={t.agent?.searchPlaceholder || 'Search for more tokens to ask Agent'}
-            />
-          </div>
-        )}
       </div>
 
-      {selectId === 1 && (
-        <div className="mt-4 flex flex-col overflow-hidden rounded-[8px] border-[1px] border-black bg-white">
-          <CoinList
-            isOpen={isOpen}
-            isLogin={isLogin}
-            searchStr={searchStr}
-            onConsultClick={(symbol, logo) => handleCoinAnalyze(symbol, 1, logo)}
-            onContractClick={(symbol, logo) => handleCoinAnalyze(symbol, 2, logo)}
-          />
-        </div>
-      )}
-
-      {selectId === 2 && (
-        <div>
-          <TendBox onAnalyze={handleStrategyAnalyze} />
-        </div>
-      )}
-
-      {/* 流式弹窗 */}
-      {streamingModal.isOpen && streamingModal.type && (
-        <StreamingModal
-          isOpen={streamingModal.isOpen}
-          onClose={handleCloseModal}
-          type={streamingModal.type}
-          query={streamingModal.query}
-          coinSymbol={streamingModal.coinSymbol}
-          title={streamingModal.title}
-          isLogin={isLogin}
-        />
-      )}
+      {/* 内容区占满剩余高度，由各 tab 自己决定内部滚动区域 */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {activeTab === 1 && <AddWatchTab isOpen={isOpen} />}
+        {activeTab === 2 && <WatchListTab isOpen={isOpen} onGoAdd={() => setActiveTab(1)} />}
+        {activeTab === 3 && <DailyReportTab />}
+      </div>
     </div>
   );
 });
