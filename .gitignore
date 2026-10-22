@@ -21,6 +21,8 @@ tsconfig.tsbuildinfo
 .DS_Store
 .idea
 **/.turbo
+# turbo watch 监视根包：仓库内的 dev 日志会被当成变更并重启所有任务
+.dev-server.log
 
 # docs
 docs/任务需求.md
@@ -31,3 +33,6 @@ docs/任务需求.md
 # local tooling / personal configs
 .claude/settings.local.json
 .superpowers/
+
+# 本地分发的预览包
+*.zip

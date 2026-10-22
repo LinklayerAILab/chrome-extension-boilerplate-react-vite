@@ -99,7 +99,8 @@ export const Points = ({
   const { t, locale } = useI18n();
   usePageInfoUpdate('points', locale);
   const isLogin = useSelector((state: RootState) => state.user.isLogin);
-  const isDev = process.env.CLI_CEB_DEV === 'true';
+  // CEB_ENV 决定链与合约（dev / test / prod）；CLI_CEB_DEV 只表示构建形态
+  const isDev = (process.env.CEB_ENV ?? 'prod') !== 'prod';
 
   // 充值选项列表
   const [list, setList] = useState<ListItem[]>([

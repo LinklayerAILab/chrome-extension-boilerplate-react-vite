@@ -27,6 +27,8 @@ interface ICebEnv {
 interface ICebCliEnv {
   readonly CLI_CEB_DEV: string;
   readonly CLI_CEB_FIREFOX: string;
+  /** 环境预设：dev / test / prod（缺省按 CLI_CEB_DEV 推导） */
+  readonly CLI_CEB_ENV?: string;
 }
 
 export type EnvType = ICebEnv & ICebCliEnv & typeof dynamicEnvValues;

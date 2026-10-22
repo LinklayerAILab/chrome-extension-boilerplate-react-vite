@@ -38,7 +38,8 @@ const builds = configs.map(async ({ name, config }) => {
     ['--input']: resolve(folder, 'index.css'),
     ['--output']: resolve(rootDir, 'dist', name, 'index.css'),
     ['--config']: resolve(rootDir, 'tailwind.config.ts'),
-    ['--watch']: IS_DEV,
+    // 'always' 禁用 Tailwind 的 stdin-end 自杀（非 TTY 环境下布尔 true 会让进程直接 exit(0)）
+    ['--watch']: IS_DEV ? 'always' : false,
   };
   await buildTW(args);
   //@ts-expect-error This is hidden property into vite's resolveConfig()

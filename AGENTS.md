@@ -9,8 +9,11 @@
 
 ## Build, Test & Development Commands
 - Install deps: `pnpm install --frozen-lockfile` (Node >= 22.15.1, pnpm 10.11.0). Copy envs: `pnpm copy-env`.
+- Development environment flags are written by the cross-platform Node script `scripts/set-global-env.mjs`; `pnpm dev` does not require Bash or WSL.
 - Dev builds: `pnpm dev` (Chrome), `pnpm dev:firefox` (sets `CLI_CEB_FIREFOX`).
 - Production builds: `pnpm build` or `pnpm build:firefox`; outputs to `dist/`.
+- Test-env build: `pnpm build:test` — production-shape output (minified, no watch/HMR) wired to the test backend and testnet contracts. It loads `.env.development` via the `CLI_CEB_ENV=test` preset; see the env-section note below.
+- Env presets vs. build shape are decoupled: `CLI_CEB_ENV` (`dev`/`test`/`prod`) selects which `.env.<mode>` file and network/contract set to use, while `CLI_CEB_DEV` only controls build shape (watch, minify, sourcemaps, HMR). Browser code must branch on the injected `process.env.CEB_ENV`, never on `CLI_CEB_DEV`. Stop `pnpm dev` before running `build:test` — a running `turbo watch` reacts to the `.env` rewrite and `clean:bundle`s the fresh output.
 - Package zip: `pnpm zip` or `pnpm zip:firefox` (uses `packages/zipper`).
 - Quality: `pnpm lint`, `pnpm lint:fix`, `pnpm type-check`, `pnpm format`.
 - E2E: `pnpm e2e` (runs `zip` then WebdriverIO via Turbo). Clean artifacts: `pnpm clean`.
