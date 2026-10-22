@@ -34,7 +34,7 @@ const manifest = {
   version: packageJson.version,
   description: 'Unlock Your Live Trading Data, Ignite Trading Social Connections — Powered by Agent Intelligence.',
   host_permissions: ['<all_urls>'],
-  permissions: ['storage', 'scripting', 'tabs', 'notifications'],
+  permissions: ['storage', 'scripting', 'tabs', 'notifications', 'alarms'],
   options_page: 'options/index.html',
   background: {
     service_worker: 'background.js',

@@ -4,6 +4,7 @@ import userReducer from './slices/userSlice';
 import uiReducer from './slices/uiSlice';
 import pageInfoReducer from './slices/pageInfoSlice';
 import tokenReducer from './slices/tokenSlice';
+import guardReducer from './slices/guardSlice';
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     ui: uiReducer,
     pageInfo: pageInfoReducer,
     tokens: tokenReducer,
+    guard: guardReducer,
   },
 });
 

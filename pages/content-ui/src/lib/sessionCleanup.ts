@@ -10,6 +10,7 @@ import { store } from '@src/store';
 import { logout as logoutAction } from '@src/store/slices/userSlice';
 import { setSidePanelOpen, setSelectedMenuId } from '@src/store/slices/uiSlice';
 import { ACCESS_TOKEN_KEY } from './storageKeys';
+import { clearGuardPushAuth } from './guardPush';
 
 export function handleUnauthorizedSession(): void {
   // 幂等守卫：并发 401（如轮询+弹层同时过期）只清理一次
@@ -21,5 +22,7 @@ export function handleUnauthorizedSession(): void {
   store.dispatch(logoutAction());
   store.dispatch(setSidePanelOpen(false));
   store.dispatch(setSelectedMenuId(1));
+  // 停止 background 的告警轮询（token 已失效，继续轮询只会 401）
+  clearGuardPushAuth();
   window.dispatchEvent(new Event('unauthorized'));
 }

@@ -1,5 +1,14 @@
 import 'webextension-polyfill';
 import { exampleThemeStorage } from '@extension/storage';
+import {
+  disableGuardPushPolling,
+  enableGuardPushPolling,
+  pollGuardAlerts,
+  registerGuardPushListeners,
+} from './guard-push';
+
+// Guard 告警通知：alarm 轮询 + 通知点击（register 后 service worker 重启也会自动恢复）
+registerGuardPushListeners();
 
 exampleThemeStorage.get().then(theme => {
   console.log('theme', theme);
@@ -156,6 +165,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'RECORD_FIRST_OPEN') {
     recordFirstOpen();
     sendResponse({ success: true });
+    return true;
+  }
+
+  // Guard 推送：内容脚本开启 / 关闭告警轮询
+  if (request.type === 'GUARD_PUSH_ENABLE') {
+    const { accessToken, address, apiBaseUrl } = request;
+    if (typeof accessToken === 'string' && typeof address === 'string' && typeof apiBaseUrl === 'string') {
+      enableGuardPushPolling({ accessToken, address, apiBaseUrl })
+        .then(() => sendResponse({ success: true }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+    } else {
+      sendResponse({ success: false, error: 'Invalid payload' });
+    }
+    return true;
+  }
+
+  if (request.type === 'GUARD_PUSH_DISABLE') {
+    disableGuardPushPolling()
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.type === 'GUARD_PUSH_POLL_NOW') {
+    pollGuardAlerts()
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   }
 

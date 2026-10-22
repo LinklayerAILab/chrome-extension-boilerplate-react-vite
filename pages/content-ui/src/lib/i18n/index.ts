@@ -20,6 +20,17 @@ export type { LocaleMessages };
 
 export const defaultLocale: Locale = 'en';
 
+/** 与 bodyguard-app 一致的 Intl 语言标签（数字/日期格式化用） */
+const LOCALE_TAGS: Record<Locale, string> = {
+  en: 'en-US',
+  zh: 'zh-CN',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+  ru: 'ru-RU',
+};
+
+export const getLocaleTag = (locale: Locale): string => LOCALE_TAGS[locale] ?? LOCALE_TAGS.en;
+
 // Get browser language
 export const getBrowserLocale = (): Locale => {
   const browserLang = navigator.language.split('-')[0] as Locale;

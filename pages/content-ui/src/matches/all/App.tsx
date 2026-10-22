@@ -31,6 +31,8 @@ import {
   syncPoints,
 } from '@src/store/slices/userSlice';
 import { setSelectedMenuId, setSidePanelOpen } from '@src/store/slices/uiSlice';
+import { refreshGuardEntitlement } from '@src/store/slices/guardSlice';
+import { clearGuardPushAuth, enableGuardPush, isGuardPushEnabled } from '@src/lib/guardPush';
 import { LoginPanel } from './components/LoginPanel';
 import { SiweMessage } from 'siwe';
 import { getAddress } from 'viem';
@@ -45,7 +47,9 @@ import { user_rewardpoints } from '@src/api/user';
 import { usePageInfoSync } from '@src/lib/hooks/usePageInfoSync';
 
 const envValues = (process.env as Record<string, string | undefined>) ?? {};
-const IS_DEV = envValues.CLI_CEB_DEV === 'true';
+// 环境分流用 CEB_ENV（dev / test / prod），不能用 CLI_CEB_DEV：
+// build:test 是生产构建形态，但需要走测试 SIWE 域名。
+const IS_TEST_ENV = (envValues.CEB_ENV ?? 'prod') !== 'prod';
 
 // ⚠️ 白名单配置 - 只有这些域名才会注入 Content Script UI
 // 格式：精确匹配域名或通配符 *.example.com
@@ -314,7 +318,7 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
     const chainId = chainIdValue?.startsWith('0x') ? Number.parseInt(chainIdValue, 16) : Number(chainIdValue);
 
     const siweMessage = new SiweMessage({
-      domain: IS_DEV ? envValues.CEB_TEST_SIWE_DOMAIN : envValues.CEB_PROD_SIWE_DOMAIN,
+      domain: IS_TEST_ENV ? envValues.CEB_TEST_SIWE_DOMAIN : envValues.CEB_PROD_SIWE_DOMAIN,
       address: checksumAddress,
       statement: 'Sign in with Ethereum to LinkLayer AI Agent',
       uri: API_BASE_URL.replace(/\/$/, ''), // 移除末尾的斜杠
@@ -343,6 +347,12 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
       }),
     );
     store.dispatch(syncPoints());
+    // 登录/账号切换后同步 Guard 权益（状态、到期时间、关注位上限、静音状态）
+    store.dispatch(refreshGuardEntitlement());
+    // 已开启告警通知的用户：账号切换后把新 token 同步给 background，避免继续用旧账号轮询
+    if (isGuardPushEnabled()) {
+      enableGuardPush().catch(err => console.warn('[App] Re-enable guard push failed:', err));
+    }
     try {
       const userInfo = await get_user_info();
       if (userInfo?.data) {
@@ -904,6 +914,8 @@ const SidePanelContentInner = () => {
       console.error('[App] Logout API failed:', error);
     } finally {
       store.dispatch(logoutAction());
+      // 停止 background 的告警通知轮询
+      clearGuardPushAuth();
       handleDisconnect();
     }
   }, [handleDisconnect]);
@@ -1116,8 +1128,8 @@ const SidePanelContentInner = () => {
               </button>
             </div>
           )}
-          {/* 内容区域 */}
-          <div className="w-full">{renderContent()}</div>
+          {/* 内容区域（h-full 让 PageLayout / Politer 的 h-full 有确定的高度基准） */}
+          <div className="h-full w-full">{renderContent()}</div>
         </div>
         {isLogin && (
           <div className="flex w-[74px] flex-col items-center justify-between border-l border-l-2 border-black py-[1.5vh]">

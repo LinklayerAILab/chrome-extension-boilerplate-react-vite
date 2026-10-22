@@ -1,10 +1,24 @@
-import { Select, Switch } from '@src/ui';
+import { Select, Switch, message } from '@src/ui';
 import { useI18n } from '@src/lib/i18n';
 import { localeOptions } from '@src/lib/i18n/localeOptions';
 import type { Locale } from '@src/lib/i18n';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '@src/store';
+import { mutePush } from '@src/api/guard';
+import {
+  isPushDisabledError,
+  refreshGuardEntitlement,
+  selectEntitlement,
+  selectIsPushMuted,
+  selectPushSupported,
+  setPushSupported,
+} from '@src/store/slices/guardSlice';
 import { XPlatformComponent } from './XPlatformComponent';
+
+/** 设置面板「关闭通知」= 长期静音（与横幅的 24h 临时静音共用 muted_until，仅时长不同） */
+const LONG_MUTE_DURATION_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 
 // ???????????
 const PLATFORM_SETTINGS_KEY = 'platform_settings';
@@ -622,6 +636,55 @@ export const PlatformInjectionManager = () => {
   return null;
 };
 
+/**
+ * 通知开关：关闭 = 长期静音（服务端 muted_until），开启 = 取消静音。
+ * 与 GuardEntitlementBar 的静音开关共享同一后端字段，任一改动后同步刷新权益。
+ */
+const NotificationSwitch = () => {
+  const { t } = useI18n();
+  const tAny = t as unknown as Record<string, any>;
+  const dispatch = useDispatch<AppDispatch>();
+  const isLogin = useSelector((state: RootState) => state.user?.isLogin ?? false);
+  const entitlement = useSelector(selectEntitlement);
+  const pushSupported = useSelector(selectPushSupported);
+  const muted = useSelector(selectIsPushMuted);
+  const [loading, setLoading] = useState(false);
+
+  // 打开面板时拉一次权益，保证开关状态反映当前静音情况
+  useEffect(() => {
+    if (isLogin) dispatch(refreshGuardEntitlement());
+  }, [isLogin, dispatch]);
+
+  const handleToggle = useCallback(
+    async (enabled: boolean) => {
+      setLoading(true);
+      try {
+        await mutePush(enabled ? null : new Date(Date.now() + LONG_MUTE_DURATION_MS).toISOString());
+        await dispatch(refreshGuardEntitlement()).unwrap();
+      } catch (error) {
+        if (isPushDisabledError(error)) {
+          dispatch(setPushSupported(false));
+        } else {
+          message.error(error instanceof Error ? error.message : tAny?.common?.requestFailed || 'Request failed');
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [dispatch, tAny],
+  );
+
+  // 未登录或后端未启用推送时不展示：没有可静音的对象
+  if (!isLogin || !entitlement || !pushSupported) return null;
+
+  return (
+    <div className="mb-2 flex items-center justify-between">
+      <span>{t.settings.notifications}</span>
+      <Switch size="small" checked={!muted} disabled={loading} onChange={checked => handleToggle(checked)} />
+    </div>
+  );
+};
+
 export const SettingPanel = ({ children }: { children: React.ReactNode }) => {
   const { locale, changeLocale, t } = useI18n();
   const { settings, updateSetting } = usePlatformSettings();
@@ -651,6 +714,7 @@ export const SettingPanel = ({ children }: { children: React.ReactNode }) => {
           onChange={handleLanguageChange}
         />
       </div>
+      <NotificationSwitch />
       <div className="mb-2 h-[1px] bg-[#eee]"></div>
       <div className="mb-2">{t.settings.pluginPermissions}</div>
       <div className="mb-2 flex items-center justify-between">
