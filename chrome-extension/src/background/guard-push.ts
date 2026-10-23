@@ -137,6 +137,35 @@ const buildNotification = (alert: GuardAlertItem) => {
   };
 };
 
+/**
+ * 把本轮拉到的告警标记为已读。
+ *
+ * 为什么必须做：轮询用 unread_only=1 取数，若不回写 read_at，未读集合只增不减
+ * （线上曾达 1099 条），列表很快触顶 limit=20，更新更旧的告警会被永久跳过。
+ * 标记已读后 unread_only 退化为「尚未处理过的」。
+ *
+ * 单条失败不影响其余：下一轮还会重新取到它，再由 lastSeenId 去重兜底。
+ */
+const markAlertsRead = async (state: GuardPushState, items: GuardAlertItem[]): Promise<void> => {
+  await Promise.all(
+    items.map(async item => {
+      if (item.id === undefined || item.id === null) return;
+      try {
+        await fetch(`${state.apiBaseUrl}/v1/guard/alerts/${item.id}/read`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${state.accessToken}`,
+            Address: state.address,
+            Source: '5',
+          },
+        });
+      } catch {
+        // 网络抖动：忽略，下一轮会再次拉到并重试
+      }
+    }),
+  );
+};
+
 /** 轮询未读告警并推送系统通知 */
 export const pollGuardAlerts = async (): Promise<void> => {
   const state = await readState();
@@ -175,17 +204,21 @@ export const pollGuardAlerts = async (): Promise<void> => {
   // 首次开启：只记录游标，不把历史告警全部弹一遍
   if (!state.initialized) {
     await writeState({ lastSeenId: maxId, initialized: true });
+    void markAlertsRead(state, items);
     return;
   }
 
   const fresh = items.filter(item => (item.id ?? 0) > state.lastSeenId).sort((a, b) => a.id - b.id);
-  if (fresh.length === 0) return;
 
-  for (const alert of fresh) {
-    chrome.notifications.create(`${NOTIFICATION_PREFIX}${alert.id}`, buildNotification(alert));
+  if (fresh.length > 0) {
+    for (const alert of fresh) {
+      chrome.notifications.create(`${NOTIFICATION_PREFIX}${alert.id}`, buildNotification(alert));
+    }
+    await writeState({ lastSeenId: maxId });
   }
 
-  await writeState({ lastSeenId: maxId });
+  // 无论是否推送都标记已读：游标之前的存量数据也要清空，否则未读集合会持续膨胀
+  void markAlertsRead(state, items);
 };
 
 /** 点击通知：在当前标签页打开侧边栏，没有可用标签页时打开 web 域 */
