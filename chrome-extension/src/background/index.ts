@@ -3,7 +3,7 @@ import { exampleThemeStorage } from '@extension/storage';
 import {
   disableGuardPushPolling,
   enableGuardPushPolling,
-  pollGuardAlerts,
+  pollGuardMessages,
   registerGuardPushListeners,
 } from './guard-push';
 
@@ -189,7 +189,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'GUARD_PUSH_POLL_NOW') {
-    pollGuardAlerts()
+    pollGuardMessages()
       .then(() => sendResponse({ success: true }))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
