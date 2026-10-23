@@ -89,15 +89,25 @@ const buildContentScripts = async () => {
   for (const { name, config } of contentScriptConfigs) {
     console.log('[Build] Building:', name);
     const folder = resolve(matchesDir, name);
-    const args = {
+    const tailwindArgs = {
       ['--input']: resolve(folder, 'index.css'),
       ['--output']: resolve(rootDir, 'dist', name, 'index.css'),
       ['--config']: resolve(rootDir, 'tailwind.config.ts'),
-      // 'always' 禁用 Tailwind 的 stdin-end 自杀（非 TTY 环境下布尔 true 会让进程直接 exit(0)）
-      ['--watch']: IS_DEV ? 'always' : false,
     };
-    console.log('[Build] Tailwind args:', args);
-    await buildTW(args);
+    console.log('[Build] Tailwind args:', tailwindArgs);
+
+    // 必须先做一次一次性构建：入口用 `import css?inline`，CSS 不存在时 vite 打包会直接失败。
+    await buildTW({ ...tailwindArgs, ['--watch']: false });
+
+    if (IS_DEV) {
+      // 不能 await 带 watch 的 buildTW：tailwind 的 processor.watch() 返回一个永不 resolve 的
+      // Promise，await 会让后面的 vite build 永远执行不到（这正是 dev 模式下
+      // dist/content-ui/all.iife.js 一直缺失的根因）。
+      // 这里只启动、不等待：tailwind 在后台持续重写 index.css，vite 自身的 watcher
+      // 监听到该文件变化后会重新打包，热更新链路依然完整。
+      void buildTW({ ...tailwindArgs, ['--watch']: 'always' });
+    }
+
     //@ts-expect-error This is hidden property into vite's resolveConfig()
     config.configFile = false;
     await build(config);

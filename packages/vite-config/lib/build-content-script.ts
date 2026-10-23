@@ -64,15 +64,20 @@ const builds = async ({ srcDir, contentName, rootDir, matchesDir, withTw }: ICon
   configsBuilder({ matchesDir, srcDir, rootDir, contentName }).map(async ({ name, config }) => {
     if (withTw) {
       const folder = resolve(matchesDir, name);
-      const args = {
+      const tailwindArgs = {
         ['--input']: resolve(folder, 'index.css'),
         ['--output']: resolve(rootDir, 'dist', name, 'index.css'),
         ['--config']: resolve(rootDir, 'tailwind.config.ts'),
-        // 'always' 禁用 Tailwind 的 stdin-end 自杀（非 TTY 环境下布尔 true 会让进程直接 exit(0)）
-        ['--watch']: IS_DEV ? 'always' : false,
       };
 
-      await buildTW(args);
+      // 先做一次一次性构建：入口可能以 `import css?inline` 引用该文件，缺失会让 vite 打包失败
+      await buildTW({ ...tailwindArgs, ['--watch']: false });
+
+      if (IS_DEV) {
+        // tailwind 的 watch 模式返回永不 resolve 的 Promise，await 会阻塞后面的 vite build。
+        // 只启动不等待：tailwind 后台重写 index.css，vite watcher 监听到后重新打包。
+        void buildTW({ ...tailwindArgs, ['--watch']: 'always' });
+      }
     }
 
     //@ts-expect-error This is hidden property from vite's resolveConfig()
