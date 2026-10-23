@@ -13,7 +13,7 @@ const Options = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F7F7F2] text-black">
+    <div className="min-h-screen bg-white text-[#0F0F0F]">
       <MessageCenter initialMessageId={initialMessageId} />
     </div>
   );

@@ -1,18 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
 import { formatMessageDate, type GuardMessage } from './api';
+import { parseMessageContent, type ParsedCoin } from './parseMessage';
 import { useAuth, useMessageList } from './useMessageList';
 import { useMessageLocale } from './useMessageLocale';
 import type { DetailErrorKind, MessageTexts } from './i18n';
 
 /** 列表滚动触发加载的阈值（距底部像素） */
-const SCROLL_THRESHOLD = 120;
+const SCROLL_THRESHOLD = 160;
 
-/** 消息正文：后端已渲染好全文，排版符号与缩进都有语义，必须 pre-wrap + 左对齐 */
-const MessageContent = ({ content }: { content: string }) => (
-  <pre className="whitespace-pre-wrap break-words text-left font-sans text-[13px] leading-6 text-black">{content}</pre>
-);
+/** 风险色调 → 左边条与文字色（取自 01-welcome.html 的设计 token） */
+const TONE_COLORS: Record<ParsedCoin['tone'], { bar: string; text: string; dot: string }> = {
+  yellow: { bar: '#E6C200', text: '#B89A00', dot: '#E6C200' },
+  red: { bar: '#E5484D', text: '#E5484D', dot: '#E5484D' },
+  green: { bar: '#2EC94C', text: '#2E9E45', dot: '#2EC94C' },
+  unknown: { bar: '#B0B0A8', text: '#8A8A82', dot: '#B0B0A8' },
+};
 
-/** 列表项：标题 + 日期 + 币种数 + 正文首行摘要 */
+/** 品牌 logo：设计稿用 assets/logo.svg，与 botRound 为同一枚 */
+const LOGO_URL = () => chrome.runtime.getURL('options/botRound.svg');
+
+/** 正文首行摘要：跳过空行，取第一个非空行 */
+const firstLine = (content: string): string =>
+  content
+    .split('\n')
+    .map(line => line.trim())
+    .find(line => line.length > 0) ?? '';
+
+// ============ 列表项 ============
+
 const MessageRow = ({
   message,
   active,
@@ -24,33 +39,109 @@ const MessageRow = ({
   onClick: () => void;
   t: MessageTexts;
 }) => {
-  const summary =
-    message.content
-      .split('\n')
-      .map(line => line.trim())
-      .find(line => line.length > 0) ?? '';
+  const summary = firstLine(message.content);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-xl px-3.5 py-3 text-left transition-colors ${
-        active ? 'bg-black text-white' : 'bg-white hover:bg-black/[0.03]'
+      className={`flex w-full items-start gap-3.5 border-b border-[#f2f2ec] px-6 py-4 text-left transition-colors last:border-b-0 ${
+        active ? 'bg-[#FAFAF5]' : 'hover:bg-[#FAFAF5]'
       }`}>
-      <div className={`text-[12px] font-semibold ${active ? 'text-white' : 'text-black'}`}>{message.title}</div>
-      <div className={`mt-1 flex items-center gap-2 text-[11px] ${active ? 'text-white/60' : 'text-black/40'}`}>
-        <span className="tabular-nums">{formatMessageDate(message.created_at)}</span>
-        <span>·</span>
-        <span>{t.tokenCount(message.token_count)}</span>
-      </div>
-      {summary && (
-        <div className={`mt-1 truncate text-[11px] ${active ? 'text-white/50' : 'text-black/35'}`}>{summary}</div>
-      )}
+      {/* 圆形头像位：设计稿是 🚨 emoji + 浅灰底 */}
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#F2F2EA] text-[20px]">
+        🚨
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="mb-1 flex items-baseline gap-2.5">
+          <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#0F0F0F]">{message.title}</span>
+          <span className="shrink-0 text-[11.5px] text-[#B0B0A8]">{formatMessageDate(message.created_at).slice(-5)}</span>
+        </span>
+        <span className="block truncate text-[12.5px] leading-relaxed text-[#9A9A9A]">
+          {message.token_count > 0 && `${t.tokenCount(message.token_count)} · `}
+          {summary}
+        </span>
+      </span>
     </button>
   );
 };
 
-/** 详情视图：展示单条消息全文 */
+// ============ 详情页 ============
+
+/** 币种风险卡：左边条按风险等级着色 */
+const CoinCard = ({ coin }: { coin: ParsedCoin }) => {
+  const tone = TONE_COLORS[coin.tone];
+  return (
+    <div
+      className="mb-3.5 rounded-[14px] bg-[#FAFAF7] px-5 py-[18px]"
+      style={{ borderLeft: `4px solid ${tone.bar}` }}>
+      <div className="mb-3 flex items-center justify-center gap-2">
+        <span className="size-2.5 rounded-full" style={{ background: tone.dot }} />
+        <span className="text-[15px] font-extrabold text-[#0F0F0F]">{coin.symbol}</span>
+        {coin.level && (
+          <span className="text-[12px] font-bold" style={{ color: tone.text }}>
+            · {coin.level}
+          </span>
+        )}
+      </div>
+
+      {coin.sync && <p className="mb-2.5 text-center text-[12.5px] text-[#C26A00]">{coin.sync}</p>}
+      {coin.change && <p className="mb-2.5 text-center text-[12px] text-[#8A8A8A]">{coin.change}</p>}
+
+      <ul className="space-y-2">
+        {coin.reasons.map((reason, index) => (
+          <li key={index} className="text-center text-[13px] leading-normal text-[#444444]">
+            <span className="font-semibold text-[#0F0F0F]">{reason.text}</span>
+            {reason.detail && <span className="mt-0.5 block text-[12px] text-[#8A8A8A]">{reason.detail}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+/** 推送正文气泡：头部图标 + 标题 + meta + 分割线 + 摘要 + 币种卡 + 免责 */
+const MessageBubble = ({ message, t }: { message: GuardMessage; t: MessageTexts }) => {
+  const parsed = parseMessageContent(message.content);
+
+  return (
+    <div className="flex items-start gap-3">
+      <img src={LOGO_URL()} className="size-9 shrink-0 rounded-[10px]" alt="" />
+      <div className="min-w-0 flex-1 rounded-tl-[4px] rounded-tr-[18px] rounded-br-[18px] rounded-bl-[18px] border border-[#ECECE5] bg-white px-6 py-[22px] shadow-[0_1px_3px_rgba(15,15,15,0.04)]">
+        <div className="mb-1.5 text-center">
+          <div className="mb-3 inline-flex size-[46px] items-center justify-center rounded-[14px] bg-[#CCFF00] text-[22px]">
+            🚨
+          </div>
+          <h1 className="mb-2 text-[18px] font-extrabold text-[#0F0F0F]">{message.title}</h1>
+          <p className="text-[12px] text-[#A3A3A3]">
+            {formatMessageDate(message.created_at)}
+            {message.token_count > 0 && ` · ${t.tokenCount(message.token_count)}`}
+          </p>
+        </div>
+
+        <hr className="my-[18px] border-t border-[#F0F0EA]" />
+
+        {parsed.coins.length === 0 ? (
+          // 解析不出币种块：原样展示，保留后端排版
+          <pre className="whitespace-pre-wrap break-words text-left font-sans text-[13px] leading-6 text-[#444444]">
+            {parsed.rawFallback ?? message.content}
+          </pre>
+        ) : (
+          <>
+            {parsed.summary && (
+              <p className="mb-5 text-center text-[14px] font-semibold text-[#0F0F0F]">{parsed.summary}</p>
+            )}
+            {parsed.coins.map((coin, index) => (
+              <CoinCard key={`${coin.symbol}-${index}`} coin={coin} />
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const MessageDetail = ({
   message,
   loading,
@@ -60,48 +151,46 @@ const MessageDetail = ({
 }: {
   message: GuardMessage | null;
   loading: boolean;
-  /** 错误标识，由 t 翻译成当前语言文案 */
   errorKind?: DetailErrorKind;
   onBack: () => void;
   t: MessageTexts;
 }) => (
-  <div className="space-y-3">
-    <button
-      type="button"
-      onClick={onBack}
-      className="text-[12px] text-black/45 transition-colors hover:text-black">
-      {t.backToList}
-    </button>
-
+  <div className="flex flex-1 flex-col">
     {loading && (
-      <div className="flex items-center justify-center rounded-xl bg-white py-16 text-[12px] text-black/35">
-        {t.loading}
-      </div>
+      <div className="flex flex-1 items-center justify-center py-24 text-[13px] text-[#B0B0A8]">{t.loading}</div>
     )}
 
     {!loading && errorKind && (
-      <div className="rounded-xl bg-[#FFFCE0] px-3.5 py-2.5 text-[12px] text-[#8A7A00]">{t[errorKind]}</div>
+      <div className="m-6 rounded-xl bg-[#FFFCE0] px-4 py-3 text-[13px] text-[#8A7A00]">{t[errorKind]}</div>
     )}
 
     {!loading && !errorKind && message && (
-      <article className="rounded-xl bg-white p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-        <header className="mb-3 border-b border-black/[0.06] pb-3">
-          <h2 className="text-[13px] font-semibold text-black">{message.title}</h2>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-black/40">
-            <span className="tabular-nums">{formatMessageDate(message.created_at)}</span>
-            <span>·</span>
-            <span>{t.tokenCount(message.token_count)}</span>
-          </div>
-        </header>
-        <MessageContent content={message.content} />
-      </article>
+      <>
+        <div className="flex-1 bg-[#FAFAF7] px-6 pb-5 pt-7">
+          <MessageBubble message={message} t={t} />
+        </div>
+        <div className="bg-[#FAFAF7] px-6 pb-6">
+          <p className="pl-12 text-[11px] leading-relaxed text-[#B0B0A8]">ℹ️ {t.disclaimer}</p>
+        </div>
+      </>
     )}
 
     {!loading && !errorKind && !message && (
-      <div className="rounded-xl bg-white py-16 text-center text-[12px] text-black/35">{t.notFound}</div>
+      <div className="flex flex-1 items-center justify-center py-24 text-[13px] text-[#B0B0A8]">{t.notFound}</div>
     )}
+
+    <div className="border-t border-[#EFEFE9] bg-white px-6 py-3.5">
+      <button
+        type="button"
+        onClick={onBack}
+        className="w-full rounded-full border border-[#E6E6E0] py-2.5 text-[13px] text-[#8A8A8A] transition-colors hover:border-[#CCFF00] hover:bg-[#CCFF00] hover:text-[#0F0F0F]">
+        {t.backToList}
+      </button>
+    </div>
   </div>
 );
+
+// ============ 列表容器 ============
 
 interface MessageCenterProps {
   /** 从通知跳转时带入的消息 id；有值时直接进入详情视图 */
@@ -141,12 +230,10 @@ export const MessageCenter = ({ initialMessageId }: MessageCenterProps) => {
 
   const handleScroll = useCallback(() => {
     if (list.loadingMore || !list.hasMore) return;
-    // 页面级滚动：以整页文档为滚动容器
     const distanceToBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
     if (distanceToBottom < SCROLL_THRESHOLD) void list.loadMore();
   }, [list]);
 
-  // 页面级滚动：监听 window 而非内部容器；详情视图不需要
   useEffect(() => {
     if (detailId !== null) return;
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -156,39 +243,73 @@ export const MessageCenter = ({ initialMessageId }: MessageCenterProps) => {
   const handleBack = () => {
     setDetailId(null);
     window.scrollTo({ top: 0 });
-    // 清掉 URL 参数，刷新后不再回到详情
     window.history.replaceState(null, '', window.location.pathname);
   };
 
   const detailView = detailId !== null;
 
   return (
-    <div className="mx-auto w-full max-w-[800px] px-4 py-6">
-      <header className="mb-4 flex justify-center">
-        <img src={chrome.runtime.getURL('options/botRound.svg')} className="h-9 w-9" alt="logo" />
-      </header>
-
-      {detailView ? (
-        <MessageDetail
-          message={detailMessage}
-          loading={detailLoading}
-          errorKind={detailErrorKind}
-          onBack={handleBack}
-          t={t}
-        />
-      ) : (
-        <>
-          <div className="mb-3 text-center text-[12px] font-medium text-black/45">{t.allMessages}</div>
-
-          {list.error && (
-            <div className="mb-3 rounded-xl bg-[#FFFCE0] px-3.5 py-2.5 text-[12px] text-[#8A7A00]">{t[list.error]}</div>
+    <div className="mx-auto w-full max-w-[720px] px-6 py-12">
+      {/* 外框：设计稿的圆角卡片 */}
+      <div className="flex min-h-[calc(100vh-96px)] flex-col overflow-hidden rounded-3xl border border-[#E6E6E0] bg-white shadow-[0_8px_40px_rgba(15,15,15,0.08)]">
+        {/* 头部 */}
+        <header className="flex items-center gap-3.5 border-b border-[#EFEFE9] bg-white px-[24px] py-[18px]">
+          <img src={LOGO_URL()} className="size-11 shrink-0 rounded-xl" alt="LinkLayerAI" />
+          <div className="min-w-0 flex-1">
+            {detailView ? (
+              <>
+                <p className="text-[16px] font-extrabold text-[#0F0F0F]">LinkLayerAI Agent</p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#8A8A8A]">
+                  <span className="size-[7px] rounded-full bg-[#9ED400]" />
+                  {t.agentOnline}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="flex items-center gap-2.5 text-[16px] font-extrabold text-[#0F0F0F]">
+                  {t.allMessages}
+                  {list.total > 0 && (
+                    <span className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-[#CCFF00] px-[7px] text-[12px] font-extrabold text-[#0F0F0F]">
+                      {list.total}
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 text-[12px] text-[#8A8A8A]">{t.fromAgents}</p>
+              </>
+            )}
+          </div>
+          {detailView && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="shrink-0 rounded-full border border-[#E6E6E0] px-4 py-[7px] text-[13px] text-[#8A8A8A] transition-colors hover:border-[#CCFF00] hover:bg-[#CCFF00] hover:text-[#0F0F0F]">
+              {t.backShort}
+            </button>
           )}
+        </header>
 
-          <div className="space-y-1.5">
+        {detailView ? (
+          <MessageDetail
+            message={detailMessage}
+            loading={detailLoading}
+            errorKind={detailErrorKind}
+            onBack={handleBack}
+            t={t}
+          />
+        ) : (
+          <div className="flex flex-1 flex-col">
+            {list.error && (
+              <div className="m-6 rounded-xl bg-[#FFFCE0] px-4 py-3 text-[13px] text-[#8A7A00]">{t[list.error]}</div>
+            )}
+
             {!ready || list.loading ? (
-              <div className="rounded-xl bg-white py-16 text-center text-[12px] text-black/35">{t.loading}</div>
+              <div className="flex flex-1 items-center justify-center py-24 text-[13px] text-[#B0B0A8]">
+                {t.loading}
+              </div>
             ) : list.items.length === 0 ? (
-              <div className="rounded-xl bg-white py-16 text-center text-[12px] text-black/35">{t.empty}</div>
+              <div className="flex flex-1 items-center justify-center py-24 text-[13px] text-[#B0B0A8]">
+                {t.empty}
+              </div>
             ) : (
               <>
                 {list.items.map(message => (
@@ -200,17 +321,14 @@ export const MessageCenter = ({ initialMessageId }: MessageCenterProps) => {
                     t={t}
                   />
                 ))}
-                {list.loadingMore && (
-                  <div className="py-4 text-center text-[11px] text-black/30">{t.loading}</div>
-                )}
-                {!list.hasMore && list.items.length > 0 && (
-                  <div className="py-4 text-center text-[11px] text-black/25">{t.noMore}</div>
-                )}
+                <div className="py-5 text-center text-[11.5px] text-[#B0B0A8]">
+                  {list.loadingMore ? t.loading : !list.hasMore ? t.noMore : ''}
+                </div>
               </>
             )}
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 };
