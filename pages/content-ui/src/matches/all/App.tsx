@@ -33,8 +33,9 @@ import {
 } from '@src/store/slices/userSlice';
 import { setSelectedMenuId, setSidePanelOpen } from '@src/store/slices/uiSlice';
 import { refreshGuardEntitlement, resetGuardState } from '@src/store/slices/guardSlice';
-import { clearGuardPushAuth, enableGuardPush, ensureGuardPushSync, isGuardPushEnabled } from '@src/lib/guardPush';
+import { clearGuardPushAuth, enableGuardPush, ensureGuardPushSync } from '@src/lib/guardPush';
 import { setAccountSwitching } from '@src/lib/sessionCleanup';
+import { syncPushLangForCurrentUser } from '@src/api/guardLang';
 import { LoginPanel } from './components/LoginPanel';
 import { SiweMessage } from 'siwe';
 import { getAddress } from 'viem';
@@ -362,10 +363,29 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
     store.dispatch(syncPoints());
     // 登录/账号切换后同步 Guard 权益（状态、到期时间、关注位上限、静音状态）
     store.dispatch(refreshGuardEntitlement());
-    // 已开启告警通知的用户：账号切换后把新 token 同步给 background，避免继续用旧账号轮询
-    if (isGuardPushEnabled()) {
-      enableGuardPush().catch(err => console.warn('[App] Re-enable guard push failed:', err));
+    /**
+     * 推送语言是用户级设置，新账号在服务端大概率还是 auto。
+     * 本地若已有明确语言（用户选过 / 浏览器语言），立刻推给服务端，
+     * 否则新账号的告警推送会用默认语言渲染，与界面不一致。
+     * 用 await 保证在后续业务请求之前完成，避免首条推送语言错乱。
+     */
+    try {
+      await syncPushLangForCurrentUser();
+    } catch (error) {
+      // 语言同步失败不阻断登录流程
+      console.warn('[App] Sync push language failed:', error);
     }
+    /**
+     * 账号切换后把新 token 同步给 background。
+     *
+     * 注意这里不能再用 isGuardPushEnabled() 做前置判断：该开关的真相源是
+     * chrome.storage.local 的 guardPushState，即「background 当前是否在轮询」。
+     * 换号前 background 持有的是旧账号的 token，若因为某种原因被清空（例如旧
+     * token 的 401），前置判断会直接跳过同步，于是新账号再也不会轮询。
+     * 这里改为无条件同步——用户既然登录成功，就该按当前账号轮询；用户主动
+     * 关闭过推送的情况由 GUARD_PUSH_DISABLE 在登出路径处理。
+     */
+    await enableGuardPush().catch(err => console.warn('[App] Re-enable guard push failed:', err));
     try {
       const userInfo = await get_user_info();
       if (userInfo?.data) {

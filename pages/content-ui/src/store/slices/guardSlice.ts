@@ -25,17 +25,21 @@ export const isPushDisabledError = (error: unknown): boolean =>
 
 /**
  * 拉取权益信息。
- * 失败时返回 null 并保留旧值：未登录 / 网络抖动不应清空已展示的权益。
+ *
+ * 失败时**必须 reject**，不能吞成 null 返回。
+ *
+ * 原先 catch { return null } 会把所有错误伪装成「成功但无数据」，而 fulfilled
+ * reducer 又只在 payload 非空时才赋值 —— 于是请求失败时界面会一直显示上一次的
+ * 数据。换账号场景下这意味着「新账号拉取失败 → 继续显示上一个账号的试用期和
+ * 关注位」，用户看到的是别人的权益，且无从察觉。
+ *
+ * 让失败走 rejected，由 reducer 清空为 null（显示空态而非错误数据）。
  */
 export const refreshGuardEntitlement = createAsyncThunk<GuardEntitlement | null, void>(
   'guard/refreshEntitlement',
   async () => {
-    try {
-      const res = await getEntitlement();
-      return res.data ?? null;
-    } catch {
-      return null;
-    }
+    const res = await getEntitlement();
+    return res.data ?? null;
   },
 );
 
@@ -58,10 +62,12 @@ const guardSlice = createSlice({
       })
       .addCase(refreshGuardEntitlement.fulfilled, (state, action) => {
         state.entitlementLoading = false;
-        if (action.payload) state.entitlement = action.payload;
+        state.entitlement = action.payload;
       })
       .addCase(refreshGuardEntitlement.rejected, state => {
         state.entitlementLoading = false;
+        // 请求失败：清空而非保留。保留会让换账号后继续展示上一个账号的权益。
+        state.entitlement = null;
       })
       .addCase(logout, () => initialState);
   },

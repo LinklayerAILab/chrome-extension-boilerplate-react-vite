@@ -12,7 +12,7 @@ import {
   type GuardToken,
 } from '@src/api/guard';
 import { shouldPromptGuardPush } from '@src/lib/guardPush';
-import { selectIsPushMuted } from '@src/store/slices/guardSlice';
+import { refreshGuardEntitlement, selectIsPushMuted } from '@src/store/slices/guardSlice';
 import { formatPrice, formatPriceFull, gainColor } from '@src/lib/display';
 import { TokenIcon } from './TokenIcon';
 import { PushPromptDialog } from './PushPromptDialog';
@@ -195,6 +195,8 @@ export const AddWatchTab = memo(({ isOpen }: AddWatchTabProps) => {
               item.token_id === token.token_id ? { ...item, is_watched: false, watchlist_id: null } : item,
             ),
           );
+          // 取关同样改变关注位用量，立即刷新权益
+          void dispatch(refreshGuardEntitlement());
         } else {
           const res = await addToWatchlist({ token_id: token.token_id });
           setList(prev =>
@@ -207,6 +209,12 @@ export const AddWatchTab = memo(({ isOpen }: AddWatchTabProps) => {
           if (!isPushMuted && shouldPromptGuardPush()) {
             setShowPushPrompt(true);
           }
+          /**
+           * 关注位用量与试用激活状态由后端计算（首次加币会激活 48h 试用），
+           * 必须立即拉取权益，否则横幅要等 60 秒轮询才更新，
+           * 表现为「关注后仍显示 未激活 / 0 / 10」。
+           */
+          void dispatch(refreshGuardEntitlement());
         }
       } catch (error) {
         message.error(error instanceof Error ? error.message : tAny?.common?.requestFailed || 'Request failed');

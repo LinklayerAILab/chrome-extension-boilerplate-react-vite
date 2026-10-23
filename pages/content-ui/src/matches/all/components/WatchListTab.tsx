@@ -152,6 +152,8 @@ export const WatchListTab = memo(({ isOpen, onGoAdd }: WatchListTabProps) => {
       setItems(prev => prev.filter(item => item.id !== id));
       try {
         await removeFromWatchlist(id);
+        // 删除后关注位用量变化，立即刷新权益（否则横幅要等 60 秒轮询）
+        void dispatch(refreshGuardEntitlement());
       } catch (error) {
         setItems(snapshot);
         message.error(error instanceof Error ? error.message : tAny?.common?.requestFailed || 'Request failed');
@@ -159,7 +161,7 @@ export const WatchListTab = memo(({ isOpen, onGoAdd }: WatchListTabProps) => {
         setDeletingId(null);
       }
     },
-    [tAny],
+    [dispatch, tAny],
   );
 
   /**
@@ -172,7 +174,12 @@ export const WatchListTab = memo(({ isOpen, onGoAdd }: WatchListTabProps) => {
         message.warning(tAny?.common?.pleaseLogin || 'Please login first');
         return;
       }
-      const latest = await dispatch(refreshGuardEntitlement()).unwrap();
+      // refreshGuardEntitlement 失败会 reject（不再吞成 null），这里必须兜住，
+      // 否则会变成未捕获的 Promise rejection。失败时回退到 Redux 里的快照，
+      // 仍由下方统一判断试用/订阅状态。
+      const latest = await dispatch(refreshGuardEntitlement())
+        .unwrap()
+        .catch(() => null);
       const status = latest?.status ?? entitlement?.status;
       if (status === 'trial_expired' || status === 'paid_expired') {
         message.error(

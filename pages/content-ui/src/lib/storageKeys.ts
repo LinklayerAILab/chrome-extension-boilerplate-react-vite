@@ -14,5 +14,6 @@ export const LOCALE_KEY = withPrefix('content-ui-locale');
 export const WEB_APP_DATA_KEY = withPrefix('webAppData');
 // 用户点击「稍后」跳过推送授权引导；仅在下次试用激活时再次弹出
 export const GUARD_PUSH_PROMPT_SKIPPED_KEY = withPrefix('guard-push-prompt-skipped');
-// 浏览器通知授权 + 推送订阅状态（本地记录，避免每次关注都重复授权）
-export const GUARD_PUSH_AUTH_KEY = withPrefix('guard-push-auth');
+// 注意：推送开关不再存 localStorage —— 它按站点 origin 隔离，会被单站的会话清理
+// 误删导致轮询永久停死。真相源改为 chrome.storage.local 的 guardPushState
+// （由 background 维护），详见 lib/guardPush.ts 的说明。

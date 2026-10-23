@@ -9,8 +9,11 @@
  * 客户端首次进入需 GET 拉取并覆盖本地语言；用户手动切换后 PUT 同步。
  */
 import { API_BASE_URL } from '@src/api/config';
-import { ACCESS_TOKEN_KEY, ADDRESS_KEY } from '@src/lib/storageKeys';
+import { ACCESS_TOKEN_KEY, ADDRESS_KEY, LOCALE_KEY } from '@src/lib/storageKeys';
 import type { Locale } from '@src/lib/i18n';
+
+/** 与 I18nProvider 使用同一个存储键（@Linklayerai/content-ui-locale） */
+const LOCALE_STORAGE_KEY = LOCALE_KEY;
 
 /** 后端返回的语言值；auto 表示未设置、跟随设备 */
 export type ServerLocale = Locale | 'auto';
@@ -94,4 +97,41 @@ export const putGuardPushLang = async (locale: ServerLocale): Promise<boolean> =
   } catch {
     return false;
   }
+};
+
+/** 读取本地已生效的语言（chrome.storage → localStorage → 浏览器语言），返回 null 表示无可用值 */
+const readLocalLocale = async (): Promise<Locale | null> => {
+  try {
+    const stored = await chrome.storage.local.get([LOCALE_STORAGE_KEY]);
+    const value = stored[LOCALE_STORAGE_KEY];
+    if (typeof value === 'string' && SERVICE_LOCALES.has(value)) return value as Locale;
+  } catch {
+    // 存储不可用：继续尝试 localStorage
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (raw && SERVICE_LOCALES.has(raw)) return raw as Locale;
+  } catch {
+    // ignore
+  }
+
+  const fromBrowser = (navigator.language || '').split(/[-_]/)[0].toLowerCase();
+  return SERVICE_LOCALES.has(fromBrowser) ? (fromBrowser as Locale) : null;
+};
+
+/**
+ * 账号切换/登录后立刻把本地语言同步到新账号。
+ *
+ * 为什么需要：推送语言是用户级设置，新账号在服务端通常是 auto（跟随订阅时的
+ * 设备语言）。本地明明有明确语言，若不同步，新账号的告警推送会用默认英语渲染，
+ * 与界面语言不一致。这里在拿到新 token 后立即 PUT，不等下一次打开侧边栏。
+ *
+ * 不读服务端当前值：切号场景下服务端一定属于新账号（要么 auto，要么该账号
+ * 自己设过）。若是后者，用本地语言覆盖也符合「界面即所见」的直觉。
+ */
+export const syncPushLangForCurrentUser = async (): Promise<boolean> => {
+  const locale = await readLocalLocale();
+  if (!locale) return false;
+  return putGuardPushLang(locale);
 };
