@@ -12,7 +12,24 @@ import { setSidePanelOpen, setSelectedMenuId } from '@src/store/slices/uiSlice';
 import { ACCESS_TOKEN_KEY } from './storageKeys';
 import { clearGuardPushAuth } from './guardPush';
 
+/**
+ * 账号切换进行中标志。
+ *
+ * 切换钱包账号时，旧 token 的请求可能返回 401（后端已 logout 或 token 被替换），
+ * 若此时走完整的 handleUnauthorizedSession，会把刚写入的新会话连同告警推送开关
+ * 一起清掉 —— 表现为「切换账号后再也收不到通知」，且没有任何自愈路径。
+ * 切换流程自己会处理失败（见 handleAccountSwitch），这里直接忽略过渡态的 401。
+ */
+let accountSwitching = false;
+
+/** 由切换流程设置；切换期间屏蔽 401 会话清理 */
+export const setAccountSwitching = (value: boolean): void => {
+  accountSwitching = value;
+};
+
 export function handleUnauthorizedSession(): void {
+  if (accountSwitching) return;
+
   // 幂等守卫：并发 401（如轮询+弹层同时过期）只清理一次
   const state = store.getState() as { user: { isLogin: boolean } };
   if (!state.user.isLogin && !window.localStorage.getItem(ACCESS_TOKEN_KEY)) {

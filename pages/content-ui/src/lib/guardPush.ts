@@ -117,3 +117,20 @@ export const pollGuardPushNow = (): void => {
     void chrome.runtime.lastError;
   });
 };
+
+/**
+ * 自愈：确保 background 的轮询状态与本地登录态一致。
+ *
+ * 为什么需要：background 在 401 时会 disableGuardPushPolling() 删掉整个
+ * guardPushState 与 alarm。若这发生在账号切换过程中（旧 token 的 401 与
+ * 新 token 写入交错），轮询会永久停止且没有任何自愈路径 —— 用户表现为
+ * 「切换账号后再也收不到通知」。本地 guard-push-auth 仍是 enabled=true，
+ * UI 看起来一切正常。
+ *
+ * enableGuardPushPolling 本身是幂等的（同 token 重复调用只刷新 alarm），
+ * 因此每次侧边栏打开/页面加载时调用一次即可修复任何不一致。
+ */
+export const ensureGuardPushSync = (): void => {
+  if (!isGuardPushEnabled()) return;
+  void enableGuardPush().catch(err => console.warn('[guardPush] self-heal failed:', err));
+};

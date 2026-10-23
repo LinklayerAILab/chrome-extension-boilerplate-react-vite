@@ -76,6 +76,20 @@ const userSlice = createSlice({
     setIsLogin: (state, action: PayloadAction<boolean>) => {
       state.isLogin = action.payload;
     },
+    /**
+     * 清空与账号绑定的用户数据，但保留登录态。
+     *
+     * 用于账号切换：新账号的 token 已换好，但 points / otherInfo 仍是旧账号的。
+     * 直接依赖后续请求覆盖并不可靠 —— syncPoints 的 rejected 与 get_user_info 的
+     * catch 都会保留旧值，导致界面展示别人的积分和资料。切换前先归零，
+     * 请求失败也只是空态。
+     */
+    clearUserData: state => {
+      window.localStorage.removeItem(OTHER_INFO_KEY);
+      state.points = 0;
+      state.pointsLoading = false;
+      state.otherInfo = emptyOtherInfo;
+    },
     logout: state => {
       window.localStorage.removeItem(ACCESS_TOKEN_KEY);
       window.localStorage.removeItem(OTHER_INFO_KEY);
@@ -104,7 +118,7 @@ const userSlice = createSlice({
   },
 });
 
-export const { setUserInfo, logout, setPoints, initializeFromLocalStorage, setOtherInfo, setIsLogin } =
+export const { setUserInfo, logout, setPoints, initializeFromLocalStorage, setOtherInfo, setIsLogin, clearUserData } =
   userSlice.actions;
 
 export default userSlice.reducer;

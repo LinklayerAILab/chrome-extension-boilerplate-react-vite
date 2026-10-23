@@ -24,6 +24,7 @@ import { Popover, message } from '@src/ui';
 import { RootState, store } from '@src/store';
 import { logout as logoutApi } from '@src/api/user';
 import {
+  clearUserData,
   initializeFromLocalStorage,
   logout as logoutAction,
   setOtherInfo,
@@ -31,8 +32,9 @@ import {
   syncPoints,
 } from '@src/store/slices/userSlice';
 import { setSelectedMenuId, setSidePanelOpen } from '@src/store/slices/uiSlice';
-import { refreshGuardEntitlement } from '@src/store/slices/guardSlice';
-import { clearGuardPushAuth, enableGuardPush, isGuardPushEnabled } from '@src/lib/guardPush';
+import { refreshGuardEntitlement, resetGuardState } from '@src/store/slices/guardSlice';
+import { clearGuardPushAuth, enableGuardPush, ensureGuardPushSync, isGuardPushEnabled } from '@src/lib/guardPush';
+import { setAccountSwitching } from '@src/lib/sessionCleanup';
 import { LoginPanel } from './components/LoginPanel';
 import { SiweMessage } from 'siwe';
 import { getAddress } from 'viem';
@@ -337,6 +339,17 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
       invite_code: inviteCode,
     });
 
+    /**
+     * 拿到新 token 后、写入新状态前，先清空与用户绑定的旧数据。
+     *
+     * 为什么必须先清：refreshGuardEntitlement / syncPoints 的 fulfilled reducer
+     * 只在 payload 非空时赋值（guardSlice.ts:59-62、userSlice.ts:97-100），
+     * 新账号请求失败时会静默保留上一个账号的权益、积分、用户资料 —— 用户看到的
+     * 是别人的数据。先归零再拉取，失败也只会是空态，不会串号。
+     */
+    store.dispatch(resetGuardState());
+    store.dispatch(clearUserData());
+
     window.localStorage.setItem(ACCESS_TOKEN_KEY, result.data.access_token);
     window.localStorage.setItem(ADDRESS_KEY, result.data.address || checksumAddress);
 
@@ -384,6 +397,9 @@ const handleSiweLogin = async (address: string, providerId?: string) => {
 // 模块级开关：防止账户切换时 accountsChanged 事件与 2s 轮询并发触发重复登录
 let accountSwitchInProgress = false;
 
+/** 切换结束后继续保持屏蔽 401 清理的时长：覆盖旧 token 请求的延迟返回 */
+const ACCOUNT_SWITCH_GUARD_MS = 10_000;
+
 // 检测到钱包账户切换时，自动用新账户重新走 SIWE 登录
 // 成功时 setUserInfo 会直接覆盖旧 token/address（不调用后端 logout）
 const handleAccountSwitch = async (newAddress: string, providerId?: string | null): Promise<void> => {
@@ -397,15 +413,24 @@ const handleAccountSwitch = async (newAddress: string, providerId?: string | nul
     return;
   }
   accountSwitchInProgress = true;
+  // 切换期间屏蔽 401 会话清理：旧 token 的过渡态 401 不应触发全局登出，
+  // 否则会连本地 guard-push-auth 一起清掉，导致轮询永久停止。
+  setAccountSwitching(true);
   try {
     const ok = await handleSiweLogin(newAddress, providerId ?? undefined);
     if (!ok) {
       // 重新签名失败（用户拒绝/取消）→ 仅本地清会话回到登录页，保持钱包已连接，用户可再次点击连接
       store.dispatch(logoutAction());
+      // 必须同时停掉 background 的告警轮询：它还持有上一个账号的 token，
+      // 不清的话用户已经"登出"却仍会收到旧账号的告警通知。
+      clearGuardPushAuth();
       message.warning('Signature cancelled. Please sign in again with the new account.');
     }
   } finally {
     accountSwitchInProgress = false;
+    // 切换结束后需等新 token 的请求落定再恢复 401 清理，
+    // 否则延迟返回的旧 token 401 仍会触发全局登出。
+    window.setTimeout(() => setAccountSwitching(false), ACCOUNT_SWITCH_GUARD_MS);
   }
 };
 
@@ -432,6 +457,13 @@ const SidePanelContentInner = () => {
   const dragStartPoint = useRef({ x: 0, y: 0 });
   const dragButtonRef = useRef<HTMLDivElement>(null);
   const isLogin = useSelector((state: RootState) => state.user.isLogin);
+  /**
+   * 当前登录地址。
+   * 用作 Politer 的 key：切换钱包账号时 dispatch(setUserInfo) 会更新它，
+   * key 变化让 React 销毁并重建整个模块，一次性清空所有 tab 的本地 state
+   * （关注列表的 is_watched、看板数据、日报流等），避免残留上一个账号的数据。
+   */
+  const userAddress = useSelector((state: RootState) => state.user.address);
   const selectedMenuId = useSelector((state: RootState) => state.ui.selectedMenuId);
   const isOpen = useSelector((state: RootState) => state.ui.isSidePanelOpen);
   const currentPageKey = pageKeyMap[selectedMenuId] ?? 'alpha';
@@ -622,6 +654,8 @@ const SidePanelContentInner = () => {
     const handleMessage = async (request: { type: string; event?: string; data?: any }) => {
       if (request.type === 'OPEN_SIDEPANEL') {
         store.dispatch(setSidePanelOpen(true));
+        // 每次打开侧边栏都校准一次推送轮询（幂等），修复可能被清空的 background 状态
+        ensureGuardPushSync();
 
         // 打开侧边栏时立即检查钱包连接状态
         if (isConnected) {
@@ -1028,7 +1062,7 @@ const SidePanelContentInner = () => {
         {selectedMenuId === 2 && <AddApi />}
         {selectedMenuId === 3 && <Minting />}
         {selectedMenuId === 4 && <Perps />}
-        {selectedMenuId === 5 && <Politer />}
+        {selectedMenuId === 5 && <Politer key={userAddress} />}
         {selectedMenuId === 7 && <Token />}
         {selectedMenuId === 6 && (
           <Points
@@ -1205,6 +1239,12 @@ const SidePanelContent = () => <SidePanelContentInner />;
 const App = () => {
   useEffect(() => {
     store.dispatch(initializeFromLocalStorage());
+    /**
+     * 自愈：本地标记已开启通知、但 background 的 guardPushState 已被清空时
+     * （例如账号切换期间的 401 清理），这里重新把登录态同步过去，重建轮询。
+     * 该调用幂等，正常情况只是刷新一次 alarm。
+     */
+    ensureGuardPushSync();
   }, []);
 
   useEffect(() => {
