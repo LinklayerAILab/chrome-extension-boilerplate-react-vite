@@ -6,7 +6,7 @@ import { exampleThemeStorage } from '@extension/storage';
 import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
 import AlertPreview from '@src/alert-preview/AlertPreview';
 
-type Tab = 'preview' | 'home';
+type Tab = 'preview' | 'about';
 
 const Options = () => {
   const { isLight } = useStorage(exampleThemeStorage);
@@ -16,39 +16,43 @@ const Options = () => {
   const goGithubSite = () => chrome.tabs.create(PROJECT_URL_OBJECT);
 
   return (
-    <div className={cn('min-h-screen', isLight ? 'bg-slate-50 text-gray-900' : 'bg-gray-800 text-gray-100')}>
-      <nav className="flex items-center gap-1 border-b border-gray-300 bg-white px-4 py-2">
-        <img src={chrome.runtime.getURL(logo)} className="mr-3 h-6" alt="logo" />
-        {(
-          [
-            ['preview', '告警推送预览'],
-            ['home', '关于'],
-          ] as [Tab, string][]
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={cn(
-              'rounded-md px-3 py-1 text-[13px] transition-colors',
-              tab === key ? 'bg-black font-semibold text-white' : 'text-gray-600 hover:bg-gray-100',
-            )}>
-            {label}
-          </button>
-        ))}
+    <div className="min-h-screen bg-[#F7F7F2] text-black">
+      <nav className="border-b-[1.5px] border-black bg-white">
+        <div className="mx-auto flex w-full max-w-[1000px] items-center gap-2 px-4 py-2.5">
+          <img src={chrome.runtime.getURL(logo)} className="mr-3 h-6" alt="logo" />
+          {(
+            [
+              ['preview', '告警推送预览'],
+              ['about', '关于'],
+            ] as [Tab, string][]
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={cn(
+                'rounded-lg border-2 border-black px-3 py-1.5 text-[12px] font-bold transition-colors',
+                tab === key ? 'bg-[#CCFF00] text-black' : 'bg-white text-black/45 hover:bg-[#F4FFC8]',
+              )}>
+              {label}
+            </button>
+          ))}
+        </div>
       </nav>
 
       {tab === 'preview' ? (
         <AlertPreview />
       ) : (
-        <div className="App">
-          <button onClick={goGithubSite}>
-            <img src={chrome.runtime.getURL(logo)} className="App-logo" alt="logo" />
-          </button>
-          <p>
-            Edit <code>pages/options/src/Options.tsx</code>
-          </p>
-          <ToggleButton onClick={exampleThemeStorage.toggle}>{t('toggleTheme')}</ToggleButton>
+        <div className="mx-auto w-full max-w-[1000px] px-4 py-8">
+          <div className="flex flex-col items-center gap-4 rounded-[6.5px] border-[1.5px] border-black bg-white py-12">
+            <button onClick={goGithubSite}>
+              <img src={chrome.runtime.getURL(logo)} className="h-10" alt="logo" />
+            </button>
+            <p className="text-[13px] text-black/60">
+              Edit <code className="rounded bg-[#F3F3F3] px-1">pages/options/src/Options.tsx</code>
+            </p>
+            <ToggleButton onClick={exampleThemeStorage.toggle}>{t('toggleTheme')}</ToggleButton>
+          </div>
         </div>
       )}
     </div>
