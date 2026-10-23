@@ -66,6 +66,33 @@ export const disableGuardPushPolling = async (): Promise<void> => {
   await chrome.alarms.clear(ALARM_NAME);
 };
 
+/**
+ * 确保轮询 alarm 与已持久化的开关状态一致（自愈）。
+ *
+ * 为什么需要：chrome.alarms 在扩展重载 / 浏览器重启后会被清空，而
+ * guardPushState.enabled 仍保存在 chrome.storage.local 里。若不在启动时重建，
+ * UI 看起来「已开启」，实际永远不会轮询，告警静默失效。
+ */
+const ensureAlarm = async (): Promise<void> => {
+  try {
+    const state = await readState();
+    const existing = await chrome.alarms.get(ALARM_NAME);
+    const shouldPoll = state.enabled && Boolean(state.accessToken) && Boolean(state.apiBaseUrl);
+
+    if (shouldPoll) {
+      if (!existing) {
+        await chrome.alarms.create(ALARM_NAME, { periodInMinutes: POLL_INTERVAL_MINUTES });
+      }
+      return;
+    }
+
+    // 已关闭却残留 alarm（异常退出等）：一并清掉，避免无谓唤醒
+    if (existing) await chrome.alarms.clear(ALARM_NAME);
+  } catch {
+    // 自愈失败不影响 service worker 其他逻辑，下次唤醒会再试
+  }
+};
+
 /** 开启/更新轮询（内容脚本登录态变化时调用） */
 export const enableGuardPushPolling = async (payload: {
   accessToken: string;
@@ -196,4 +223,11 @@ export const registerGuardPushListeners = (): void => {
   chrome.notifications.onClicked.addListener(notificationId => {
     void handleGuardNotificationClick(notificationId);
   });
+
+  // 浏览器启动 / 扩展安装或更新后 alarm 会被清空，需按已持久化的开关状态重建
+  chrome.runtime.onStartup.addListener(() => void ensureAlarm());
+  chrome.runtime.onInstalled.addListener(() => void ensureAlarm());
+
+  // service worker 任何一次唤醒都顺带校准一次，覆盖「浏览器崩溃后重启」等未触发上述事件的场景
+  void ensureAlarm();
 };
