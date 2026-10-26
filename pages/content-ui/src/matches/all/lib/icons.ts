@@ -1,9 +1,7 @@
 /**
- * 图标 URL 生成工具
- * Content Script 需要使用 chrome.runtime.getURL() 来访问扩展资源
+ * 预定义图标名称。
+ * 使用处通过 chrome.runtime.getURL(`content-ui/${name}`) 取地址。
  */
-
-export const getIconUrl = (iconName: string): string => chrome.runtime.getURL(`content-ui/${iconName}`);
 
 // 预定义的图标名称
 export const ICONS = {

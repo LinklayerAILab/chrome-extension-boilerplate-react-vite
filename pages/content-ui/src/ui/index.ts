@@ -14,10 +14,6 @@ export type { InputProps, TextAreaProps, PasswordProps } from './Input';
 export { Select } from './Select';
 export type { SelectProps, SelectOption } from './Select';
 
-// Form
-export { Form, FormItem, useForm } from './Form';
-export type { FormProps, FormItemProps, FormInstance, Rule, RuleTypeWithRule, FieldData } from './Form';
-
 // Popover
 export { Popover } from './Popover';
 export type { PopoverProps } from './Popover';
@@ -25,10 +21,6 @@ export type { PopoverProps } from './Popover';
 // Message
 export { default as message } from './Message';
 export type { MessageInstance, MessageType } from './Message';
-
-// Spin
-export { Spin } from './Spin';
-export type { SpinProps } from './Spin';
 
 // Skeleton
 export { Skeleton } from './Skeleton';

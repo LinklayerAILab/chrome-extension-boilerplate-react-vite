@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { makeEntryPointPlugin } from '@extension/hmr';
 import { getContentScriptEntries, withPageConfig } from '@extension/vite-config';
@@ -64,25 +64,6 @@ const contentScriptConfigs = Object.entries(allEntries).map(([name, entry]) => (
   }),
 }));
 
-// 复制 wallet.html 和 wallet.js 到 dist 目录
-const copyWalletFiles = async () => {
-  const files = ['wallet.html', 'wallet.js'];
-  const publicDir = resolve(rootDir, 'public');
-  const targetDir = resolve(rootDir, '..', '..', 'dist', 'content-ui');
-
-  for (const file of files) {
-    const sourcePath = resolve(publicDir, file);
-    const targetPath = resolve(targetDir, file);
-
-    if (existsSync(sourcePath)) {
-      copyFileSync(sourcePath, targetPath);
-      console.log(`[Build] ${file} copied to dist/content-ui/`);
-    } else {
-      console.warn(`[Build] ${file} not found in public directory`);
-    }
-  }
-};
-
 // 构建 Content Scripts（顺序执行，避免 Tailwind CLI 共享状态导致输出不一致）
 const buildContentScripts = async () => {
   console.log('[Build] Starting build for', contentScriptConfigs.length, 'scripts');
@@ -116,5 +97,4 @@ const buildContentScripts = async () => {
   console.log('[Build] All builds completed');
 };
 
-// 并行构建所有
-await Promise.all([buildContentScripts(), copyWalletFiles()]);
+await buildContentScripts();

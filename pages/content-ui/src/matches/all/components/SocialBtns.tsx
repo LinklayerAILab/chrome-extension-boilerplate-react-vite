@@ -1,6 +1,5 @@
 import { Popover } from '@src/ui';
 import { SettingPanel } from './SettingPanel';
-import { InvitePanel } from './InvitePanel';
 
 interface SocialBtnsProps {
   onMenuSelect?: (menuId: number) => void;
