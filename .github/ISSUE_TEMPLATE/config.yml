@@ -1,7 +1,1 @@
-contact_links:
-  - name: Questions & Discussion
-    url: https://github.com/LinklayerAILab/chrome-extension-boilerplate-react-vite/discussions
-    about: Please ask usage questions and discuss ideas here.
-  - name: Report a Security Vulnerability
-    url: https://github.com/LinklayerAILab/chrome-extension-boilerplate-react-vite/security/advisories/new
-    about: Please report security vulnerabilities privately through GitHub Security Advisories.
+blank_issues_enabled: true

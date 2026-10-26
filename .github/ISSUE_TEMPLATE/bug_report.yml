@@ -3,7 +3,7 @@ description: Create a bug report.
 title: "[Bug]: "
 labels: [ "bug", "triage" ]
 assignees:
-  - LinklayerAILab
+  - cbs8710064
 
 body:
   - type: textarea
