@@ -27,8 +27,6 @@
     "@extension/ui": "workspace:*",
     "@lottiefiles/dotlottie-react": "^0.17.13",
     "@reduxjs/toolkit": "^2.6.1",
-    "@tanstack/react-query": "^5.62.16",
-    "@wagmi/core": "^3.2.2",
     "axios": "^1.7.9",
     "github-markdown-css": "^5.8.1",
     "html-to-image": "^1.11.11",
@@ -40,8 +38,7 @@
     "siwe": "^2.3.2",
     "swiper": "^11.2.10",
     "typewriter-effect": "^2.22.0",
-    "viem": "^2.24.2",
-    "wagmi": "^2.14.6"
+    "viem": "^2.24.2"
   },
   "devDependencies": {
     "@extension/hmr": "workspace:*",
