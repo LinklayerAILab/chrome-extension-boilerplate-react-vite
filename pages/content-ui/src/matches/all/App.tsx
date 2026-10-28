@@ -20,7 +20,7 @@ import { PlatformInjectionManager } from './components/SettingPanel';
 
 // 使用 chrome.runtime.getURL 获取扩展资源
 const getLogo = (path: string) => chrome.runtime.getURL(`content-ui/${path}`);
-import { Popover, message } from '@src/ui';
+import { message } from '@src/ui';
 import { RootState, store } from '@src/store';
 import { logout as logoutApi } from '@src/api/user';
 import {
@@ -36,7 +36,7 @@ import { refreshGuardEntitlement, resetGuardState } from '@src/store/slices/guar
 import { clearGuardPushAuth, enableGuardPush, ensureGuardPushSync } from '@src/lib/guardPush';
 import { setAccountSwitching } from '@src/lib/sessionCleanup';
 import { syncPushLangForCurrentUser } from '@src/api/guardLang';
-import { LoginPanel } from './components/LoginPanel';
+import { AccountPage } from './components/AccountPage';
 import { SiweMessage } from 'siwe';
 import { getAddress } from 'viem';
 import { getSiweNonce, validate_token, verifySiweMessage } from '@src/api/user';
@@ -46,7 +46,6 @@ import { API_BASE_URL } from '@src/api/config';
 import { ACCESS_TOKEN_KEY, ADDRESS_KEY, INVITE_CODE_KEY } from '@src/lib/storageKeys';
 import { useSelector } from 'react-redux';
 import { selectPageInfo } from '@src/store/slices/pageInfoSlice';
-import { user_rewardpoints } from '@src/api/user';
 import { usePageInfoSync } from '@src/lib/hooks/usePageInfoSync';
 
 const envValues = (process.env as Record<string, string | undefined>) ?? {};
@@ -66,7 +65,7 @@ declare global {
 }
 window.__CONTENT_UI_WHITELIST_DOMAINS__ = CONTENT_UI_WHITELIST_DOMAINS;
 
-const pageKeyMap: Record<number, 'alpha' | 'api' | 'earn' | 'perps' | 'poliet' | 'points' | 'token'> = {
+const pageKeyMap: Record<number, 'alpha' | 'api' | 'earn' | 'perps' | 'poliet' | 'points' | 'token' | 'account'> = {
   1: 'alpha',
   2: 'api',
   3: 'earn',
@@ -74,6 +73,7 @@ const pageKeyMap: Record<number, 'alpha' | 'api' | 'earn' | 'perps' | 'poliet' |
   5: 'poliet',
   6: 'points',
   7: 'token',
+  8: 'account',
 };
 
 /**
@@ -284,16 +284,29 @@ const connectPageContextWallet = async (providerId?: string): Promise<string> =>
   }
 };
 
-// 获取当前连接的钱包账户
-const getCurrentAccounts = async (providerId?: string): Promise<string[]> => {
+/**
+ * 获取当前连接的钱包账户。
+ *
+ * 返回值语义必须严格区分（冷启动误报「钱包已断开」的根因）：
+ * - `string[]`      查询成功；空数组 = 钱包**确证**没有账户（真的断开了）
+ * - `null`          查询失败（钱包扩展尚未注入 / RPC 报错 / 桥接超时）
+ *
+ * 早期实现把异常统一 `return []`，于是浏览器冷启动、钱包扩展还没注入时，
+ * 调用方会把「暂时问不到」当成「已经断开」，进而 `clearWalletState()`
+ * 永久清除连接存档 —— 即使钱包稍后就绪也无法自动恢复，用户必须手动重连。
+ * 因此调用方**只能**在明确拿到空数组时才断开，`null` 一律跳过本轮。
+ */
+const getCurrentAccounts = async (providerId?: string): Promise<string[] | null> => {
   try {
     const accounts = providerId
       ? await executeViaBackgroundScript('wallet_getAccounts', [providerId])
       : await executeViaBackgroundScript('eth_accounts', []);
-    return accounts || [];
+    // 桥接层成功但返回非数组（provider 未就绪）同样视为查询失败
+    if (!Array.isArray(accounts)) return null;
+    return accounts;
   } catch (error) {
-    console.error('[App] Failed to get current accounts:', error);
-    return [];
+    console.warn('[App] Failed to get current accounts (provider may not be ready):', error);
+    return null;
   }
 };
 
@@ -303,7 +316,46 @@ const getCurrentChainId = async (providerId?: string): Promise<string> => {
     : await executeViaBackgroundScript('eth_chainId', []);
 };
 
-const isProviderInstanceId = (value?: string | null) => Boolean(value && value.startsWith('{'));
+/**
+ * 旧版 provider 标识：`{"isMetaMask":true,"chainId":...,"selectedAddress":...}`。
+ * 它是**易变状态的快照**（锁屏/切链就变），拿来做「钱包是否重启」的比较必然误判，
+ * 正是重启电脑后误报「钱包已断开」的根因。仅用于识别并迁移历史存档。
+ */
+const isLegacyProviderId = (value?: string | null): boolean => Boolean(value && value.startsWith('{'));
+
+/**
+ * 可用于比较的 provider 标识（新版稳定身份，如 `metamask-0` / `eip6963:io.metamask`）。
+ * 旧版 JSON 快照不稳定，不参与比较 —— 它会在加载存档时被迁移清除。
+ */
+const isProviderInstanceId = (value?: string | null): boolean => Boolean(value && !isLegacyProviderId(value));
+
+/** 等待钱包就绪的轮询参数：浏览器冷启动时扩展注入可能耗时数秒 */
+const WALLET_READY_POLL_INTERVAL_MS = 300;
+const WALLET_READY_TIMEOUT_MS = 5000;
+
+/**
+ * 轮询等待钱包就绪，供冷启动恢复使用。
+ *
+ * 用条件轮询取代固定 setTimeout：固定延时要么太短（冷启动时钱包还没注入，
+ * 于是误判断开），要么太长（正常启动白等）。这里一旦拿到**明确结果**就立即返回。
+ *
+ * @returns
+ * - `string[]` 已就绪（空数组同样算就绪 —— 属于钱包确证无账户）
+ * - `null`     超时仍未就绪。调用方**不得**据此断开，应保持现状交给周期检查。
+ */
+const waitForWalletAccounts = async (
+  providerId?: string,
+  timeoutMs: number = WALLET_READY_TIMEOUT_MS,
+): Promise<string[] | null> => {
+  const deadline = Date.now() + timeoutMs;
+  // 首次立即查询，避免正常启动场景白等一个轮询间隔
+  for (;;) {
+    const accounts = await getCurrentAccounts(providerId);
+    if (accounts !== null) return accounts;
+    if (Date.now() >= deadline) return null;
+    await new Promise(resolve => setTimeout(resolve, WALLET_READY_POLL_INTERVAL_MS));
+  }
+};
 
 const signMessageWithProvider = async (messageToSign: string, address: string, providerId?: string) => {
   if (providerId) {
@@ -467,6 +519,15 @@ const SidePanelContentInner = () => {
   const [manuallyDisconnected, setManuallyDisconnected] = useState(false); // 记录用户是否主动退出
   const [metaMaskRestarted, setMetaMaskRestarted] = useState(false); // MetaMask 是否重启
   const isLoadingRef = useRef(false);
+  /**
+   * 冷启动宽限期截止时刻（时间戳）。
+   *
+   * 浏览器重启后钱包扩展要数秒才完成注入，期间会先推 `accountsChanged: []`
+   * 或 `disconnect`（MetaMask 在网络未就绪时发 4900）。这些是**瞬时的未就绪信号**，
+   * 不是真的断开。在此窗口内收到的断开类事件一律忽略，避免 `clearWalletState()`
+   * 把存档永久清掉 —— 这正是重启后误报「钱包已断开」的事件路径根因。
+   */
+  const walletGraceUntilRef = useRef(0);
   const [buttonTopPosition, setButtonTopPosition] = useState(0);
   const [hasCustomPosition, setHasCustomPosition] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -586,29 +647,77 @@ const SidePanelContentInner = () => {
         });
 
         const savedState = await WalletStorage.loadWalletState();
+        // 明确打印关键字段：控制台里 Object 是折叠的，无法判断是否进了恢复分支
+        console.log(
+          '[App] Wallet state snapshot:',
+          JSON.stringify({
+            isConnected: savedState.isConnected,
+            address: savedState.address,
+            chainId: savedState.chainId,
+            providerId: savedState.providerId,
+            lastConnected: savedState.lastConnected,
+          }),
+        );
+
+        // 迁移：旧存档存的是易变的 JSON 快照（{"isMetaMask":true,"chainId":...}）。
+        // 它既不能用于「钱包是否重启」的比较，直接丢弃又会让老用户白丢一次连接状态。
+        // 这里改为丢弃该字段、把真实身份交给下方重新检测后写回。
+        // 注意：不能清 providerId 就立刻 save —— 必须先确认钱包仍然连接，
+        // 否则会把「已断开」误固化成有效存档。因此仅在内存中置空，validation 通过后再落盘。
+        let effectiveProviderId = savedState.providerId;
+        if (isLegacyProviderId(effectiveProviderId)) {
+          console.log('[App] Migrating legacy provider id snapshot:', effectiveProviderId);
+          effectiveProviderId = undefined;
+        }
 
         if (savedState.isConnected && savedState.address) {
+          console.log('[App] Restoring wallet state, entering startup grace window');
+          // 进入冷启动宽限期：钱包注入完成前推来的断开类事件不可信
+          walletGraceUntilRef.current = Date.now() + WALLET_READY_TIMEOUT_MS;
           // 先恢复显示状态（立即响应）
           setWalletAddress(savedState.address);
           setChainId(savedState.chainId);
           setIsConnected(true);
-          setProviderId(savedState.providerId || null);
+          setProviderId(effectiveProviderId || null);
           setManuallyDisconnected(false); // 清除主动退出标志
 
-          // 延迟验证连接是否仍然有效（避免时序问题）
-          // 等待一小段时间让 MetaMask 完全注入
-          setTimeout(async () => {
+          // 等待钱包注入完成后再验证（条件轮询，非固定延时）
+          // 冷启动时浏览器刚拉起，扩展要数秒才能把 provider 注入页面
+          void (async () => {
             try {
-              const currentAccounts = await getCurrentAccounts(savedState.providerId || undefined);
+              const currentAccounts = await waitForWalletAccounts(effectiveProviderId);
+
+              // 超时仍拿不到结果：钱包可能永远不注入（被禁用/卸载），但**不能**在此断开。
+              // 保持已恢复的显示状态，把判定权交给周期检查（它会在下次成功查询时纠偏）。
+              if (currentAccounts === null) {
+                console.warn('[App] Wallet not ready within timeout, keep last known state for periodic check');
+                return;
+              }
+
               const currentProviderId = await getProviderId();
 
-              // 检查 provider ID 是否变化（MetaMask 重启检测）
+              // 同一个钱包可能有多种 ID 形式（`eip6963:io.metamask` / `metamask-0`），
+              // 取决于 EIP-6963 注册表是否已就绪。直接按字符串比较会把同一钱包
+              // 误判为「已重启」并清档 —— 这正是重启后误报「钱包已断开」的原因。
+              // 因此先用**账户地址**判断是否还是同一个连接：地址一致就绝不断开。
+              const sameAccount =
+                currentAccounts.length > 0 &&
+                !!savedState.address &&
+                currentAccounts[0].toLowerCase() === savedState.address.toLowerCase();
+
               if (
-                isProviderInstanceId(savedState.providerId) &&
+                !sameAccount &&
+                isProviderInstanceId(effectiveProviderId) &&
                 currentProviderId &&
-                currentProviderId !== savedState.providerId
+                currentProviderId !== effectiveProviderId
               ) {
-                // MetaMask 重启，清除连接状态
+                console.warn(
+                  '[App] Provider id changed and account missing, disconnecting. saved:',
+                  effectiveProviderId,
+                  'current:',
+                  currentProviderId,
+                );
+                // 钱包重启，清除连接状态
                 setWalletAddress(null);
                 setChainId(null);
                 setIsConnected(false);
@@ -618,7 +727,7 @@ const SidePanelContentInner = () => {
               }
 
               if (currentAccounts.length === 0) {
-                // 没有账户，连接已失效
+                // 钱包明确返回空账户，连接已失效
                 setWalletAddress(null);
                 setChainId(null);
                 setIsConnected(false);
@@ -627,12 +736,10 @@ const SidePanelContentInner = () => {
               } else if (savedState.address && currentAccounts[0].toLowerCase() !== savedState.address.toLowerCase()) {
                 // 账户已切换
                 setWalletAddress(currentAccounts[0]);
-                const newChainId = await getCurrentChainId(savedState.providerId || undefined);
+                const newChainId = await getCurrentChainId(effectiveProviderId);
                 const newProviderId = await getProviderId();
                 setChainId(newChainId);
-                setProviderId(
-                  isProviderInstanceId(savedState.providerId) ? newProviderId || null : savedState.providerId || null,
-                );
+                setProviderId(newProviderId || effectiveProviderId || null);
                 await WalletStorage.saveWalletState({
                   isConnected: true,
                   address: currentAccounts[0],
@@ -642,15 +749,71 @@ const SidePanelContentInner = () => {
                 });
 
                 // 账户切换后自动用新账户重新登录
-                await handleAccountSwitch(currentAccounts[0], savedState.providerId);
+                await handleAccountSwitch(currentAccounts[0], effectiveProviderId);
               } else {
+                // 账户一致：把迁移后的稳定 id 写回存档（旧版存档首次升级时走这里）。
+                // 同时同步 React 状态，否则 setProviderId 仍是迁移前的值，
+                // 后续周期检查会拿旧值比较。
+                if (currentProviderId && currentProviderId !== savedState.providerId) {
+                  setProviderId(currentProviderId);
+                  await WalletStorage.saveWalletState({
+                    isConnected: true,
+                    address: savedState.address,
+                    chainId: savedState.chainId,
+                    lastConnected: Date.now(),
+                    providerId: currentProviderId,
+                  });
+                }
                 console.log('[App] Connection verified successfully ✅');
               }
             } catch (error) {
               console.error('[App] Failed to verify connection:', error);
               // 验证失败时保持当前状态，让定期轮询来处理
             }
-          }, 500); // 延迟 500ms 验证
+          })();
+        } else {
+          // 存档缺失（首次使用 / 旧版本清过 / 存档被误清），但钱包扩展可能仍记得
+          // 本站点的授权：`eth_accounts` 在已授权时会直接返回账户且**不会弹窗**。
+          // 此时静默重建存档，避免用户被迫手动重连一次。
+          // 注意：绝不调用 eth_requestAccounts/钱包弹窗 —— 必须由用户主动操作触发。
+          console.log('[App] No saved wallet state, probing silently for existing authorization...');
+          void (async () => {
+            try {
+              // 必须用 waitForWalletAccounts 而不是 getCurrentAccounts：
+              // 挂载瞬间钱包扩展通常还没注入，直接查会得到 null 并放弃，
+              // 白白错过「钱包仍记得本站授权」的自动恢复机会。
+              const accounts = await waitForWalletAccounts();
+              if (accounts === null) {
+                console.log('[App] Wallet not ready for silent probe, skip (periodic check will retry)');
+                return;
+              }
+              if (accounts.length === 0) {
+                console.log('[App] Wallet not authorized for this site, stay disconnected');
+                return;
+              }
+              const address = accounts[0];
+              const grantedChainId = await getCurrentChainId();
+              const detectedProviderId = await getProviderId();
+              console.log('[App] Existing wallet authorization found, restoring silently:', address);
+
+              // 进入宽限期，避免随后的瞬时事件把刚恢复的状态又清掉
+              walletGraceUntilRef.current = Date.now() + WALLET_READY_TIMEOUT_MS;
+              setWalletAddress(address);
+              setChainId(grantedChainId);
+              setIsConnected(true);
+              setProviderId(detectedProviderId || null);
+              setManuallyDisconnected(false);
+              await WalletStorage.saveWalletState({
+                isConnected: true,
+                address,
+                chainId: grantedChainId,
+                lastConnected: Date.now(),
+                providerId: detectedProviderId || undefined,
+              });
+            } catch (error) {
+              console.log('[App] Silent wallet restore skipped:', error);
+            }
+          })();
         }
       } catch (error) {
         console.error('[App] Failed to load wallet state:', error);
@@ -680,7 +843,10 @@ const SidePanelContentInner = () => {
         // 打开侧边栏时立即检查钱包连接状态
         if (isConnected) {
           const currentAccounts = await getCurrentAccounts(providerId || undefined);
-          if (currentAccounts.length === 0) {
+          // null = 钱包尚未就绪，跳过本轮，保持现有显示状态
+          if (currentAccounts === null) {
+            console.log('[App] Sidebar opened: wallet not ready, skip check');
+          } else if (currentAccounts.length === 0) {
             console.log('[App] Sidebar opened: No accounts, disconnecting...');
             setWalletAddress(null);
             setChainId(null);
@@ -730,7 +896,20 @@ const SidePanelContentInner = () => {
               // 账户切换后自动用新账户重新登录
               await handleAccountSwitch(newAddress, providerId);
             } else {
-              // 用户断开连接（锁定钱包等）
+              // 钱包报空账户。但冷启动宽限期内这多半是「扩展尚未注入完成」的瞬时信号，
+              // 而非用户真的断开 —— 此时清存档会让用户永久丢失连接，必须重新检测确认。
+              if (Date.now() < walletGraceUntilRef.current) {
+                console.log('[App] accountsChanged empty during startup grace, re-checking before disconnect...');
+                const verified = await getCurrentAccounts(providerId || undefined);
+                // null = 仍问不到（未就绪）；非空 = 已恢复。两种情况都不断开。
+                if (verified === null || verified.length > 0) {
+                  if (verified && verified.length > 0) {
+                    setWalletAddress(verified[0]);
+                    setIsConnected(true);
+                  }
+                  break;
+                }
+              }
               console.log('[App] Accounts changed to empty, disconnecting...');
               setWalletAddress(null);
               setChainId(null);
@@ -761,10 +940,16 @@ const SidePanelContentInner = () => {
             break;
 
           case 'disconnect':
-            console.log('[App] Wallet disconnected event received');
+            console.log('[App] Wallet disconnected event received', request.data);
             // 如果用户主动退出了，忽略断开事件
             if (manuallyDisconnected) {
               console.log('[App] Ignoring disconnect event: user manually disconnected');
+              return;
+            }
+            // 冷启动宽限期内忽略：MetaMask 在 RPC 未就绪时发 code=4900，
+            // 属于瞬时故障而非用户断开。宽限期内清存档会导致无法自动恢复。
+            if (Date.now() < walletGraceUntilRef.current) {
+              console.log('[App] Ignoring disconnect event during startup grace');
               return;
             }
 
@@ -787,7 +972,8 @@ const SidePanelContentInner = () => {
             // connect 事件通常在 wallet 已经连接后触发
             // 我们需要获取当前账户
             getCurrentAccounts(providerId || undefined).then(async accounts => {
-              if (accounts.length > 0) {
+              // null = 查询失败；connect 事件会再次触发，无需在此处理
+              if (accounts && accounts.length > 0) {
                 const address = accounts[0];
                 const currentChainId = await getCurrentChainId(providerId || undefined);
                 const currentProviderId = await getProviderId();
@@ -835,7 +1021,21 @@ const SidePanelContentInner = () => {
         const currentAccounts = await getCurrentAccounts(providerId || undefined);
         const currentProviderId = await getProviderId();
 
-        if (isProviderInstanceId(providerId) && currentProviderId && currentProviderId !== providerId) {
+        // 查询失败（钱包扩展重载/未就绪/桥接超时）：跳过本轮，不当作断开。
+        // 冷启动时这里最容易误判，一旦 clearWalletState 就再也恢复不了。
+        if (currentAccounts === null) {
+          console.log('[App] Periodic check: wallet not ready, skip this round');
+          return;
+        }
+
+        // 与加载存档时同样的判据：地址一致就说明还是同一个连接，
+        // providerId 形式差异（eip6963 vs type-index）不能作为断开依据。
+        const sameAccount =
+          currentAccounts.length > 0 &&
+          !!walletAddress &&
+          currentAccounts[0].toLowerCase() === walletAddress.toLowerCase();
+
+        if (!sameAccount && isProviderInstanceId(providerId) && currentProviderId && currentProviderId !== providerId) {
           console.warn('[App] Periodic check: Provider ID changed, disconnecting...');
           setWalletAddress(null);
           setChainId(null);
@@ -846,14 +1046,11 @@ const SidePanelContentInner = () => {
           return;
         }
 
+        // 取不到 provider ID = 钱包扩展尚未注入（冷启动/扩展重载），与「已卸载」无法区分。
+        // 此时 currentAccounts 已成功返回，说明 provider 其实在，仅为 ID 解析时序问题。
+        // 若在此处断开，会把一次瞬时的 ID 读取失败升级成永久的连接丢失，因此跳过本轮。
         if (isProviderInstanceId(providerId) && !currentProviderId) {
-          console.warn('[App] Periodic check: Provider missing, disconnecting...');
-          setWalletAddress(null);
-          setChainId(null);
-          setIsConnected(false);
-          setManuallyDisconnected(false);
-          setProviderId(null);
-          await WalletStorage.clearWalletState();
+          console.log('[App] Periodic check: provider id unavailable, skip this round');
           return;
         }
 
@@ -954,12 +1151,20 @@ const SidePanelContentInner = () => {
 
   useEffect(() => {
     const handleUnauthorized = () => {
-      disconnectWallet(false);
+      // 登录过期只意味着「会话失效」，与钱包连接是两件事：
+      // 钱包仍可正常解锁、地址仍有效，用户重新登录即可继续。
+      // 此处原先调用 disconnectWallet(false)，会 clearWalletState() 把钱包存档
+      // 永久清掉 —— 叠加 token 约 24h 过期，用户隔天开机就会丢失钱包连接，
+      // 正是重启电脑后「钱包已断开」的另一个根因。
+      // 现在只取消 UI 上的连接标记，保留存档，让下次挂载能自动恢复地址。
+      console.log('[App] Session unauthorized: keep wallet storage for auto-restore');
+      setIsConnected(false);
+      setManuallyDisconnected(false);
     };
 
     window.addEventListener('unauthorized', handleUnauthorized);
     return () => window.removeEventListener('unauthorized', handleUnauthorized);
-  }, [disconnectWallet]);
+  }, []);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -997,49 +1202,6 @@ const SidePanelContentInner = () => {
     [],
   );
 
-  // Popover 打开时同步用户数据和积分
-  const handlePopoverOpenChange = useCallback(async (open: boolean) => {
-    // 只在打开时同步数据
-    if (!open) return;
-
-    try {
-      // 并行请求用户信息和积分
-      const [userInfoResponse, pointsResponse] = await Promise.allSettled([get_user_info(), user_rewardpoints()]);
-
-      // 处理用户信息 - 从 data 中提取并合并已有的 image
-      if (userInfoResponse.status === 'fulfilled' && userInfoResponse.value?.data) {
-        const currentOtherInfo = store.getState().user.otherInfo;
-        // 使用类型断言明确 data 的类型
-        const userData = (userInfoResponse.value as any).data as {
-          web3_address: string;
-          email: string;
-          invite_code: string;
-          invite_count: number;
-        };
-        store.dispatch(
-          setOtherInfo({
-            web3_address: userData.web3_address,
-            email: userData.email,
-            invite_code: userData.invite_code,
-            invite_count: userData.invite_count,
-            image: currentOtherInfo.image || '', // 保留已有的 image
-          }),
-        );
-      } else {
-        console.warn('[App] Failed to fetch user info:', userInfoResponse);
-      }
-
-      // 处理积分 - 使用 syncPoints thunk
-      if (pointsResponse.status === 'fulfilled' && pointsResponse.value?.data?.reward_points !== undefined) {
-        store.dispatch(syncPoints());
-      } else {
-        console.warn('[App] Failed to fetch reward points:', pointsResponse);
-      }
-    } catch (error) {
-      console.error('[App] Failed to sync user data on popover open:', error);
-    }
-  }, []);
-
   const handleLoginSuccess = () => {
     // Address is already set by handleConnectWallet
     console.log('[App] Login successful');
@@ -1058,7 +1220,7 @@ const SidePanelContentInner = () => {
       );
     }
     // 页面 ID 到 pageInfo key 的映射
-    const iconMap = {
+    const iconMap: Record<number, string> = {
       1: getLogo('alpha/alpha.svg'),
       2: getLogo('alpha/api.svg'),
       3: getLogo('alpha/minting.svg'),
@@ -1066,6 +1228,7 @@ const SidePanelContentInner = () => {
       5: getLogo('alpha/polit.svg'),
       6: getLogo('alpha/points.svg'),
       7: getLogo('alpha/token.svg'),
+      8: getLogo('account/account-banner.svg'),
     };
 
     const renderHeader = () => {
@@ -1084,6 +1247,15 @@ const SidePanelContentInner = () => {
         {selectedMenuId === 4 && <Perps />}
         {selectedMenuId === 5 && <Politer key={userAddress} />}
         {selectedMenuId === 7 && <Token />}
+        {selectedMenuId === 8 && (
+          <AccountPage
+            onLogout={handleLogout}
+            walletAddress={walletAddress || ''}
+            walletChainId={chainId || ''}
+            providerId={providerId || ''}
+            isConnected={isConnected}
+          />
+        )}
         {selectedMenuId === 6 && (
           <Points
             walletConnected={isConnected}
@@ -1169,7 +1341,7 @@ const SidePanelContentInner = () => {
       {/* 侧边窗口 */}
       <div
         data-popover-boundary
-        className={`pointer-events-auto fixed top-0 z-[9998] flex h-screen w-[500px] bg-white font-sans shadow-2xl transition-all duration-300 ease-in-out ${
+        className={`pointer-events-auto fixed top-0 z-[9998] flex h-screen w-[560px] bg-white font-sans shadow-2xl transition-all duration-300 ease-in-out ${
           isOpen ? 'right-0 opacity-100' : '-right-[500px] opacity-0'
         }`}>
         <div className={`layout-box relative flex-1 ${selectedMenuId === 7 && 'page-token'}`} id="layout-box">
@@ -1198,23 +1370,15 @@ const SidePanelContentInner = () => {
 
               {isLogin && (
                 <div className="mb-[2vh] flex items-center justify-center">
-                  <Popover
-                    content={
-                      <LoginPanel
-                        onLogout={handleLogout}
-                        walletAddress={walletAddress || ''}
-                        walletChainId={chainId || ''}
-                        providerId={providerId || ''}
-                        isConnected={isConnected}
-                      />
-                    }
-                    placement="topLeft"
-                    trigger="click"
-                    onOpenChange={handlePopoverOpenChange}>
-                    <div className="h-[4.4vh] w-[4.4vh] cursor-pointer overflow-hidden rounded-full bg-[#cf0]">
-                      {otherInfo.image ? <img src={otherInfo.image} className="h-full w-full rounded-full" /> : null}
-                    </div>
-                  </Popover>
+                  <button
+                    type="button"
+                    aria-label="My Account"
+                    className={`h-[4.4vh] w-[4.4vh] cursor-pointer overflow-hidden rounded-full bg-[#cf0] transition-opacity hover:opacity-80 ${
+                      selectedMenuId === 8 ? 'ring-2 ring-black ring-offset-1' : ''
+                    }`}
+                    onClick={() => store.dispatch(setSelectedMenuId(8))}>
+                    {otherInfo.image ? <img src={otherInfo.image} className="h-full w-full rounded-full" /> : null}
+                  </button>
                 </div>
               )}
               <Menus store={store}></Menus>

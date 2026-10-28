@@ -15,7 +15,11 @@ type PageInfoState = {
   poliet: PageInfo;
   points: PageInfo;
   token: PageInfo;
+  account: PageInfo;
 };
+
+/** pageInfo slice 中可同步文案的页面 key */
+export type PageKey = keyof PageInfoState;
 
 // 默认英文初始状态（用于 Redux store 初始化）
 const defaultInitialState: PageInfoState = {
@@ -46,6 +50,10 @@ const defaultInitialState: PageInfoState = {
   token: {
     title: 'BEP20 Liquidity Leader',
     description: 'Live on-chain filtering for the most liquid assets on BNB Chain',
+  },
+  account: {
+    title: 'My Account',
+    description: 'Your points, invites, trial, and subscription — all in this page',
   },
 };
 
@@ -81,6 +89,10 @@ const getTranslatedInitialState = (locale?: keyof typeof locales): PageInfoState
     token: {
       title: messages.pageInfo?.token?.title || defaultInitialState.token.title,
       description: messages.pageInfo?.token?.description || defaultInitialState.token.description,
+    },
+    account: {
+      title: messages.pageInfo?.account?.title || defaultInitialState.account.title,
+      description: messages.pageInfo?.account?.description || defaultInitialState.account.description,
     },
   };
 };

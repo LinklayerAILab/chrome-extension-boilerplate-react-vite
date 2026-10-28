@@ -28,8 +28,19 @@ export interface MessageTexts {
   fromAgents: string;
   /** 详情页头部返回按钮（短） */
   backShort: string;
+  /** 滚动到底部区域后出现的返回顶部按钮（无障碍标签，视觉上只有图标） */
+  backToTop: string;
   /** 免责声明（render.ts 文案，详情页底部展示） */
   disclaimer: string;
+  /**
+   * 浏览器标签页标题。countText 为格式化后的消息总数（如「1.1K」），
+   * 总数未知/为 0 时传 undefined，标题里省略括号部分。
+   */
+  pageTitle: (countText?: string) => string;
+  /** 详情视图的标签页标题：messageTitle 为消息自身的标题 */
+  detailPageTitle: (messageTitle: string) => string;
+  /** <meta name="description"> 内容 */
+  pageDescription: string;
 }
 
 /** 详情视图可能出现的错误：notFound（列表里找不到）/ sessionExpired / loadFailed */
@@ -50,7 +61,11 @@ const TEXTS: Record<MessageLocale, MessageTexts> = {
     agentOnline: '在线 · 你的 AI 交易助手',
     fromAgents: '来自你的 LinkLayerAI Agents',
     backShort: '← 返回列表',
+    backToTop: '返回顶部',
     disclaimer: '本产品仅提供链上与市场数据信号，不构成任何投资建议。',
+    pageTitle: count => `${count ? `全部消息 (${count})` : '全部消息'} · LinkLayerAI`,
+    detailPageTitle: messageTitle => `${messageTitle} · LinkLayerAI`,
+    pageDescription: '来自你的 LinkLayerAI Agents 的风险提醒与流动性消息，随时在这里查看全部历史。',
   },
   en: {
     allMessages: 'All messages',
@@ -66,7 +81,12 @@ const TEXTS: Record<MessageLocale, MessageTexts> = {
     agentOnline: 'Online · your AI trading assistant',
     fromAgents: 'From your LinkLayerAI Agents',
     backShort: '← Back',
+    backToTop: 'Back to top',
     disclaimer: 'This product provides data signals only and is not investment advice.',
+    pageTitle: count => `${count ? `All messages (${count})` : 'All messages'} · LinkLayerAI`,
+    detailPageTitle: messageTitle => `${messageTitle} · LinkLayerAI`,
+    pageDescription:
+      'Risk alerts and liquidity messages from your LinkLayerAI Agents — browse the full history anytime.',
   },
   ja: {
     allMessages: 'すべてのメッセージ',
@@ -82,7 +102,11 @@ const TEXTS: Record<MessageLocale, MessageTexts> = {
     agentOnline: 'オンライン · あなたの AI トレーディングアシスタント',
     fromAgents: 'あなたの LinkLayerAI Agents から',
     backShort: '← 一覧へ',
+    backToTop: 'トップへ戻る',
     disclaimer: '本製品はデータシグナルのみを提供し、投資アドバイスではありません。',
+    pageTitle: count => `${count ? `すべてのメッセージ (${count})` : 'すべてのメッセージ'} · LinkLayerAI`,
+    detailPageTitle: messageTitle => `${messageTitle} · LinkLayerAI`,
+    pageDescription: 'LinkLayerAI Agents からのリスク通知と流動性メッセージ。すべての履歴をいつでも確認できます。',
   },
   ko: {
     allMessages: '전체 메시지',
@@ -98,7 +122,11 @@ const TEXTS: Record<MessageLocale, MessageTexts> = {
     agentOnline: '온라인 · 나의 AI 트레이딩 어시스턴트',
     fromAgents: '나의 LinkLayerAI Agents 에서',
     backShort: '← 목록',
+    backToTop: '맨 위로',
     disclaimer: '본 제품은 데이터 신호만 제공하며 투자 자문이 아닙니다.',
+    pageTitle: count => `${count ? `전체 메시지 (${count})` : '전체 메시지'} · LinkLayerAI`,
+    detailPageTitle: messageTitle => `${messageTitle} · LinkLayerAI`,
+    pageDescription: 'LinkLayerAI Agents 가 보낸 리스크 알림과 유동성 메시지입니다. 전체 기록을 언제든 확인하세요.',
   },
   ru: {
     allMessages: 'Все сообщения',
@@ -114,7 +142,12 @@ const TEXTS: Record<MessageLocale, MessageTexts> = {
     agentOnline: 'В сети · ваш AI-торговый помощник',
     fromAgents: 'От ваших LinkLayerAI Agents',
     backShort: '← Назад',
+    backToTop: 'Наверх',
     disclaimer: 'Этот продукт предоставляет только сигналы данных и не является инвестиционной рекомендацией.',
+    pageTitle: count => `${count ? `Все сообщения (${count})` : 'Все сообщения'} · LinkLayerAI`,
+    detailPageTitle: messageTitle => `${messageTitle} · LinkLayerAI`,
+    pageDescription:
+      'Оповещения о рисках и сообщения о ликвидности от ваших LinkLayerAI Agents. Вся история всегда доступна.',
   },
 };
 

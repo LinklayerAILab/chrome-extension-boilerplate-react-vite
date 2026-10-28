@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@src/store';
 import { useI18n } from '@src/lib/i18n';
-import { Input, message } from '@src/ui';
+import { message } from '@src/ui';
 import {
   addToWatchlist,
   getPrices,
@@ -42,6 +42,8 @@ type WatchToken = GuardToken & { loading?: boolean };
 interface AddWatchTabProps {
   /** 侧边栏是否打开（关闭时暂停轮询） */
   isOpen: boolean;
+  /** 搜索关键词，由 Politer 的 tab 条右侧搜索框受控 */
+  searchStr: string;
 }
 
 /** 推送授权引导的判据见 @src/lib/guardPush（基于 /v1/guard/entitlement） */
@@ -50,7 +52,7 @@ interface AddWatchTabProps {
  * Add Watch tab：搜索代币 + 无限滚动列表 + 价格轮询 + 关注/取关（乐观更新）。
  * 移植自 bodyguard-app /add，分页由服务端 offset 承担（bodyguard 用 React Query useInfiniteQuery）。
  */
-export const AddWatchTab = memo(({ isOpen }: AddWatchTabProps) => {
+export const AddWatchTab = memo(({ isOpen, searchStr }: AddWatchTabProps) => {
   const { t, locale } = useI18n();
   const tAny = t as unknown as Record<string, any>;
   const dispatch = useDispatch<AppDispatch>();
@@ -58,7 +60,6 @@ export const AddWatchTab = memo(({ isOpen }: AddWatchTabProps) => {
   /** 用户已在设置面板/横幅里静音推送时，不再引导授权 */
   const isPushMuted = useSelector(selectIsPushMuted);
 
-  const [searchStr, setSearchStr] = useState('');
   const [list, setList] = useState<WatchToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [isScrollLoading, setIsScrollLoading] = useState(false);
@@ -68,7 +69,7 @@ export const AddWatchTab = memo(({ isOpen }: AddWatchTabProps) => {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
-  const keywordRef = useRef('');
+  const keywordRef = useRef(searchStr);
   const fetchingRef = useRef(false);
   // 请求代际：每次发起新请求自增，旧请求返回时代际不符则丢弃，防过期响应覆盖新结果
   const reqGenRef = useRef(0);
@@ -131,10 +132,11 @@ export const AddWatchTab = memo(({ isOpen }: AddWatchTabProps) => {
 
   // 首次加载
   useEffect(() => {
-    loadTokens(true, '');
+    loadTokens(true, keywordRef.current);
   }, [loadTokens]);
 
-  // 搜索防抖：输入变化后重新拉第一页
+  // 搜索防抖：输入变化后重新拉第一页。
+  // 注意：挂载时 keywordRef 已同步为传入的 searchStr（见下），避免切回来时用空关键词覆盖。
   useEffect(() => {
     if (searchStr === keywordRef.current) return;
     const timer = window.setTimeout(() => {
@@ -229,16 +231,6 @@ export const AddWatchTab = memo(({ isOpen }: AddWatchTabProps) => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="shrink-0">
-        <Input
-          search
-          allowClear
-          value={searchStr}
-          onChange={e => setSearchStr(e.target.value)}
-          placeholder={tAny?.guard?.searchPlaceholder || 'Search token name / symbol / contract'}
-        />
-      </div>
-
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6.5px] border-[1.5px] border-black bg-white">
         <div className="flex h-[48px] shrink-0 items-center justify-between bg-[#CCFF00] px-5 py-3.5 text-xs font-medium text-[#7e9d00]">
           <div className="flex flex-1 items-center justify-start">{tAny?.guard?.name || 'Name'}</div>

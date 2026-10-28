@@ -148,6 +148,34 @@ export interface LocaleMessages {
     connectFirst: string;
     /** 钱包实际已断开时地址行的提示 */
     walletDisconnected: string;
+    /** My Account 页面：关注位用量 */
+    watchQuota: string;
+    /** My Account 页面：免费试用剩余时间 */
+    freeEnds: string;
+    /** My Account 页面：已订阅用户的剩余时长（与试用期文案区分） */
+    freeEndsPaid: string;
+    /** 倒计时单位：天 */
+    durationDays: string;
+    /** 倒计时单位：小时 */
+    durationHours: string;
+    /** 倒计时单位：分 */
+    durationMinutes: string;
+    /** 倒计时单位：秒 */
+    durationSeconds: string;
+    /** My Account 页面：About Points 标题 */
+    aboutPoints: string;
+    /** My Account 页面：About Points 说明 */
+    aboutPointsDesc: string;
+    /** My Account 页面：权益列表分隔条 */
+    benefitsInclude: string;
+    /** My Account 页面：订阅按钮 */
+    subscribe: string;
+    /** My Account 页面：权益列表 5 条 */
+    benefitFreePicks: string;
+    benefitFreeQuota: string;
+    benefitMonth1: string;
+    benefitMonth3: string;
+    benefitMonth12: string;
   };
   alpha: {
     myAlphaHolding: string;
@@ -233,6 +261,8 @@ export interface LocaleMessages {
     addWatch: string;
     watchList: string;
     dailyReport: string;
+    /** 日报 tab 右侧：报告日期标签 */
+    dailyReportDate: string;
     addWatchDesc: string;
     watchListDesc: string;
     dailyReportDesc: string;
@@ -241,7 +271,10 @@ export interface LocaleMessages {
     price: string;
     follow: string;
     addMore: string;
+    /** 关注 tab：打开消息历史（options 页）的链接 */
+    messageHistory: string;
     liquidity: string;
+    explorer: string;
     waitingResponse: string;
     stop: string;
     copy: string;
@@ -372,6 +405,14 @@ export interface LocaleMessages {
       description: string;
     };
     points: {
+      title: string;
+      description: string;
+    };
+    token: {
+      title: string;
+      description: string;
+    };
+    account: {
       title: string;
       description: string;
     };

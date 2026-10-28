@@ -6,6 +6,7 @@
  * 因此直接复用现有 service 实例（同认证头、同 {code,msg,data} 响应信封处理）。
  */
 import { ACCESS_TOKEN_KEY, ADDRESS_KEY, LOCALE_KEY } from '@src/lib/storageKeys';
+import { getBrowserLocale } from '@src/lib/i18n';
 import { handleUnauthorizedSession } from '@src/lib/sessionCleanup';
 import { API_BASE_URL } from './config';
 import { service } from './service';
@@ -232,10 +233,17 @@ export const getEntitlement = (): Promise<GuardApiResponse<GuardEntitlement>> =>
 // ============ 日报 SSE 流 ============
 
 /**
- * Dify SSE 专用解析：event 行指定类型（done/error/message/not_ready），data 行为 JSON 字符串或对象。
- * 移植自 bodyguard-app src/lib/api/agent.ts parseDifySSE。
+ * Dify SSE 专用解析：event 行指定类型（start/done/error/message/not_ready），
+ * data 行为 JSON 字符串或对象。移植自 bodyguard-app src/lib/api/agent.ts parseDifySSE。
+ *
+ * @param onStart 收到 `start` 事件时回调。日报流用它取 report_date
+ *   （后端按 BJT 02:00 截断的「报告日期」），该事件此前被直接跳过。
  */
-async function* parseGuardSSE(response: Response, signal: AbortSignal): AsyncGenerator<string> {
+async function* parseGuardSSE(
+  response: Response,
+  signal: AbortSignal,
+  onStart?: (data: unknown) => void,
+): AsyncGenerator<string> {
   if (!response.body) throw new Error('No response body');
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -270,6 +278,17 @@ async function* parseGuardSSE(response: Response, signal: AbortSignal): AsyncGen
         if (eventType === 'error') {
           throw new Error(dataStr || 'Agent stream error');
         }
+        if (eventType === 'start') {
+          // 日报 start 事件携带 {today, locale, report_date}，供 UI 显示报告日期
+          if (onStart) {
+            try {
+              onStart(dataStr ? JSON.parse(dataStr) : null);
+            } catch {
+              onStart(null);
+            }
+          }
+          continue;
+        }
         if (eventType !== 'message' && eventType !== 'not_ready') continue;
 
         // 多/空 data 行 join 后可能是 '\n' 或 '\n\n' —— 是 markdown 段落分隔信号，必须保留
@@ -300,8 +319,14 @@ async function* parseGuardSSE(response: Response, signal: AbortSignal): AsyncGen
   }
 }
 
-/** 读取当前 locale（与 request.ts 的 accept-language 注入一致），默认 en */
-const getGuardLocale = (): string => window.localStorage.getItem(LOCALE_KEY) || 'en';
+/**
+ * 读取当前 locale（与 request.ts 的 accept-language 注入一致）。
+ *
+ * 回退链：localStorage 里已生效的语言 → 浏览器语言。
+ * 不能直接回退 'en'：首次打开插件且从未切过语言时 I18nProvider 可能还没把
+ * 语言写进 localStorage，此时界面按浏览器语言显示中文，请求头却是 en。
+ */
+const getGuardLocale = (): string => window.localStorage.getItem(LOCALE_KEY) || getBrowserLocale();
 
 /**
  * SSE 鉴权头：必须与 axios 实例（service.ts 拦截器）完全一致。
@@ -396,8 +421,14 @@ export async function* coinAnalysisStream(
  * 逐 chunk yield 文本，供打字机组件消费；signal 中止时静默结束。
  *
  * @param address 登录地址（checksummed），作为 `Address` 头传给 StrictAuth 校验
+ * @param onStart 收到 start 事件时回调，参数形如 `{today, locale, report_date}`；
+ *   report_date 是后端按 BJT 02:00 截断的报告日期，UI 用它显示「日报日期」
  */
-export async function* dailyReportStream(signal: AbortSignal, address?: string): AsyncGenerator<string> {
+export async function* dailyReportStream(
+  signal: AbortSignal,
+  address?: string,
+  onStart?: (data: unknown) => void,
+): AsyncGenerator<string> {
   const locale = getGuardLocale();
   const url = `${API_BASE_URL}/v1/guard/dify/daily-report?bg_locale=${encodeURIComponent(locale)}`;
 
@@ -415,5 +446,5 @@ export async function* dailyReportStream(signal: AbortSignal, address?: string):
     await throwGuardStreamError(response);
   }
 
-  yield* parseGuardSSE(response, signal);
+  yield* parseGuardSSE(response, signal, onStart);
 }

@@ -118,6 +118,8 @@ export interface GetUserInfoResponse extends ApiResponse {
     email: string;
     invite_code: string;
     invite_count: number;
+    /** 用户头像 URL，未设置时为空串 */
+    image: string;
   };
 }
 

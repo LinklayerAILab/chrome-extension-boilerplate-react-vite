@@ -11,15 +11,34 @@
  *
  * 限制（与 Web Push 的差异，需知悉）：
  * - 仅在浏览器运行时有效（关闭浏览器收不到）；
- * - 最小轮询粒度 1 分钟（chrome.alarms 限制）；
+ * - chrome.alarms 的最小周期是 1 分钟；实际间隔见 POLL_INTERVAL_MINUTES（生产 10 / 非生产 5）；
  * - 靠本地 lastSeenMessageId 去重，换账号/登出会重置。
  */
 
+import { buildMessageSummary } from '@extension/shared';
+
 const STORAGE_KEY = 'guardPushState';
 const ALARM_NAME = 'guard-push-poll';
-const POLL_INTERVAL_MINUTES = 1;
+/**
+ * 轮询间隔（分钟）。
+ *
+ * 生产环境放宽到 10 分钟：告警本身由后端 cron 评估，10 分钟延迟可接受，
+ * 而每分钟一轮 = 每用户每天 1440 次请求，对后端是纯空转成本。
+ * 非生产（dev / test 预设）保留 5 分钟，便于联调时快速看到通知。
+ *
+ * 判据用 CEB_ENV 而非 CLI_CEB_DEV：build:test 是生产形态构建但连测试后端，
+ * 与 pages/content-ui/src/matches/all/config/payment.ts 的取舍保持一致。
+ */
+const IS_PRODUCTION_ENV = (process.env.CEB_ENV ?? 'prod') === 'prod';
+const POLL_INTERVAL_MINUTES = IS_PRODUCTION_ENV ? 10 : 5;
 const NOTIFICATION_PREFIX = 'guard-msg:';
-/** 每轮拉取的未读消息条数：合并消息粒度很粗（一轮最多一条），10 条足够覆盖积压 */
+/**
+ * 每轮拉取的未读消息条数。
+ *
+ * 后端每轮评估会把该用户全部触发币合并成一条消息，但「查询即已读」+ 积压场景下
+ * 一轮仍可能返回多条（实测 5 条，total 达 700）。因此通知侧只推最新一条，
+ * 避免重启后瞬间刷出一串系统通知。
+ */
 const POLL_LIMIT = 10;
 
 export interface GuardPushState {
@@ -108,6 +127,10 @@ export const disableGuardPushPolling = async (): Promise<void> => {
  * 为什么需要：chrome.alarms 在扩展重载 / 浏览器重启后会被清空，而
  * guardPushState.enabled 仍保存在 chrome.storage.local 里。若不在启动时重建，
  * UI 看起来「已开启」，实际永远不会轮询，告警静默失效。
+ *
+ * 周期也要校准：alarm 一旦创建就会带着当时的周期一直活下去，旧版本建的
+ * 1 分钟 alarm 不会因为改了常量而自动变短。这里比对 periodInMinutes，
+ * 不一致就按当前环境重建。
  */
 const ensureAlarm = async (): Promise<void> => {
   try {
@@ -116,7 +139,7 @@ const ensureAlarm = async (): Promise<void> => {
     const shouldPoll = state.enabled && Boolean(state.accessToken) && Boolean(state.apiBaseUrl);
 
     if (shouldPoll) {
-      if (!existing) {
+      if (!existing || existing.periodInMinutes !== POLL_INTERVAL_MINUTES) {
         await chrome.alarms.create(ALARM_NAME, { periodInMinutes: POLL_INTERVAL_MINUTES });
       }
       return;
@@ -154,21 +177,23 @@ export const enableGuardPushPolling = async (payload: {
 };
 
 /**
+ * 系统通知正文里，冒号后追加的风险明细最多展示的字符数。
+ * 系统通知栏空间有限，比 options 列表行（30 字）更短。
+ */
+const NOTIFICATION_SUMMARY_LIMIT = 15;
+
+/**
  * 通知标题：直接复用后端渲染的消息头（已含 🚨 与时间）。
  * Chrome 通知标题过长会被截断，超限时回退到「N 个币种触发风险」。
  */
 const buildNotification = (message: GuardMessageItem) => {
   const title = message.title?.trim() || 'Guard Alert';
-  const firstBodyLine =
-    message.content
-      ?.split('\n')
-      .map(line => line.trim())
-      .find(line => line.length > 0) ?? '';
+  const summary = message.content ? buildMessageSummary(message.content, NOTIFICATION_SUMMARY_LIMIT) : '';
   return {
     type: 'basic' as const,
     iconUrl: chrome.runtime.getURL('icon-128.png'),
     title,
-    message: firstBodyLine || `${message.token_count} 个币种触发风险`,
+    message: summary || `${message.token_count} 个币种触发风险`,
     contextMessage: 'LinkLayer AI Guard',
     priority: 2,
   };
@@ -233,13 +258,24 @@ export const pollGuardMessages = async (): Promise<void> => {
     return;
   }
 
-  const fresh = items.filter(item => (item.id ?? 0) > state.lastSeenMessageId).sort((a, b) => a.id - b.id);
+  const fresh = items.filter(item => (item.id ?? 0) > state.lastSeenMessageId);
 
   if (fresh.length === 0) return;
 
-  for (const message of fresh) {
-    chrome.notifications.create(`${NOTIFICATION_PREFIX}${message.id}`, buildNotification(message));
-  }
+  /**
+   * 一轮只推最新一条。
+   *
+   * 开关机 / 长时间离线后积压的未读会在同一轮里被一起拉回（实测一次 5 条），
+   * 逐条 create 会在通知栏刷出一串同质告警。这里只取 id 最大的一条作为本次提醒，
+   * 其余消息不弹通知——它们仍可在消息中心看到，且后端「查询即已读」语义下
+   * 本次返回页本就会被置读。
+   *
+   * 游标仍推进到整页 maxId（而非 latestFresh.id）：否则本页内其它消息下一轮
+   * 会被当成「新的」再弹一次。
+   */
+  const latestFresh = fresh.reduce((latest, item) => ((item.id ?? 0) > (latest.id ?? 0) ? item : latest));
+  chrome.notifications.create(`${NOTIFICATION_PREFIX}${latestFresh.id}`, buildNotification(latestFresh));
+
   await writeState({ lastSeenMessageId: maxId });
 };
 

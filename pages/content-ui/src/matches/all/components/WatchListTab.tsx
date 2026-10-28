@@ -51,15 +51,13 @@ const lightBallStyle = (color?: GuardColor | string): CSSProperties => {
 interface WatchListTabProps {
   /** 侧边栏是否打开（关闭时暂停轮询） */
   isOpen: boolean;
-  /** 空态/添加卡片点击 → 切到 Add Watch tab */
-  onGoAdd: () => void;
 }
 
 /**
  * Watch List tab：关注列表卡片（健康灯球 + 价格轮询 + 流动性变化，删除直接移除）。
  * 移植自 bodyguard-app /dashboard（60s 看板轮询 + 15s 价格轮询）。
  */
-export const WatchListTab = memo(({ isOpen, onGoAdd }: WatchListTabProps) => {
+export const WatchListTab = memo(({ isOpen }: WatchListTabProps) => {
   const { t, locale } = useI18n();
   const tAny = t as unknown as Record<string, any>;
   const dispatch = useDispatch<AppDispatch>();
@@ -194,25 +192,8 @@ export const WatchListTab = memo(({ isOpen, onGoAdd }: WatchListTabProps) => {
     [dispatch, entitlement?.status, isLogin, tAny],
   );
 
-  const addMoreCard = (
-    <button
-      type="button"
-      onClick={onGoAdd}
-      className="flex h-16 w-full items-center justify-between rounded-lg border-2 border-black bg-white px-4 text-black transition-colors hover:bg-[#F4FFC8]">
-      <span className="flex items-center gap-2">
-        <span className="flex h-5 w-[15px] items-center justify-center rounded-full border border-black bg-[#CCFF00]" />
-        <span className="text-sm font-semibold">{tAny?.guard?.addMore || 'Add More Binance Tokens'}</span>
-      </span>
-      <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-black bg-white text-2xl font-semibold leading-none">
-        +
-      </span>
-    </button>
-  );
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="shrink-0">{addMoreCard}</div>
-
       {/* 列表区固定高度 + 内部滚动：卡片高度固定，超出部分在卡片区域内滚动 */}
       <div
         className="min-h-0 flex-1 overflow-y-auto"
@@ -297,7 +278,7 @@ export const WatchListTab = memo(({ isOpen, onGoAdd }: WatchListTabProps) => {
                             target="_blank"
                             rel="noreferrer"
                             className="flex-1 rounded-[5px] border border-black bg-white px-2 py-1 text-center text-xs font-semibold text-black hover:bg-[#F3F3F3]">
-                            BscScan
+                            {tAny?.guard?.explorer || 'BscScan'}
                           </a>
                         )}
                         <button

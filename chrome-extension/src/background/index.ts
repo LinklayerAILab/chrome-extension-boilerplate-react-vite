@@ -121,11 +121,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.type === 'OPEN_URL') {
-    // 在新标签页打开外部页面（如 Stripe 托管收银台）。content script 中
-    // await 之后的 window.open 会丢失用户激活手势、可能被弹窗拦截，
-    // background 的 chrome.tabs.create 则不受限制。
+    // 在新标签页打开页面。content script 中 await 之后的 window.open 会丢失
+    // 用户激活手势、可能被弹窗拦截，background 的 chrome.tabs.create 不受限制。
+    //
+    // 允许两类 URL：
+    //   - https://  外部页面（如 Stripe 托管收银台）
+    //   - 本站扩展页 options/index.html  消息中心等自有页面
+    // 只放行固定路径，不放行任意 chrome-extension:// URL —— 后者等于把扩展内
+    // 任意页面交给内容脚本打开，扩大攻击面。
     const { url } = request;
-    if (typeof url === 'string' && /^https:\/\//.test(url)) {
+    const isHttps = typeof url === 'string' && /^https:\/\//.test(url);
+    const isOwnOptionsPage = typeof url === 'string' && url === chrome.runtime.getURL('options/index.html');
+    if (isHttps || isOwnOptionsPage) {
       chrome.tabs
         .create({ url, active: true })
         .then(() => sendResponse({ success: true }))
@@ -697,8 +704,18 @@ async function handleWeb3Request(request: any, sender: chrome.runtime.MessageSen
 }
 
 /**
- * 获取 provider 的唯一标识
- * 用于检�?MetaMask 是否重启
+ * 获取当前 provider 的稳定身份标识。
+ *
+ * 曾经返回 `JSON.stringify({ isMetaMask, chainId, selectedAddress })`，但那三项里
+ * 后两项是**易变状态**：钱包锁屏时 selectedAddress 为 null、切链时 chainId 变化。
+ * 于是重启浏览器后同一钱包算出的字符串必然不同，前端把它误判成「钱包实例已重启」
+ * 并断开连接、清除存档 —— 这正是重启电脑后误报「钱包已断开」的根因之一。
+ *
+ * 现在只返回**扩展身份**，格式与 getProviders()/resolveProviderById 一致：
+ * - `eip6963:<rdns>` 优先（若页面暴露了 EIP-6963 注册表且能定位到当前 provider）
+ * - 否则回退 `<type>-<index>`，如 `metamask-0`
+ *
+ * 这两个格式都能被 resolveProviderById 解析回同一个 provider，且不随锁屏/切链变化。
  */
 async function getProviderId(
   sender: chrome.runtime.MessageSender,
@@ -714,24 +731,93 @@ async function getProviderId(
       target: { tabId },
       world: 'MAIN',
       func: () => {
-        if (typeof window.ethereum === 'undefined') {
+        const eth = (window as any).ethereum;
+        if (typeof eth === 'undefined') {
           return { success: false, error: 'No ethereum provider' };
         }
 
-        // 生成一个唯一标识：使�?provider 的多个属性组�?
-        const provider = window.ethereum;
-        const identifier = {
-          isMetaMask: provider.isMetaMask,
-          // 使用 chainId �?selectedAddress 作为额外标识
-          chainId: provider.chainId || null,
-          selectedAddress: provider.selectedAddress || null,
-          // 生成一个时间戳标识（provider 对象创建时的隐式标识�?
-          // 注意：不同实例的这些属性组合可能不�?
+        // 与 getProviders() 的 detectProviderType 保持完全一致，
+        // 否则算出的 id 无法被 resolveProviderById 解析回同一个 provider
+        const detectType = (provider: any): string => {
+          if (provider?.isMetaMask) return 'metamask';
+          if (provider?.isRabby) return 'rabby';
+          if (provider?.isPhantom) return 'phantom';
+          if (provider?.isTrust) return 'trust';
+          if (provider?.isCoinbaseWallet) return 'coinbase';
+          if (provider?.isBinance) return 'binance';
+          if (provider?.isOkxWallet) return 'okx';
+          if (provider?.isBitget) return 'bitget';
+          if (provider?.isBraveWallet) return 'brave';
+          if (provider?.isKuCoin) return 'kucoin';
+          return 'unknown';
         };
 
-        // 将标识转换为字符�?
-        const idString = JSON.stringify(identifier);
-        return { success: true, result: idString };
+        const providers = Array.isArray(eth.providers) ? eth.providers : [eth];
+        const type = detectType(eth);
+
+        // 优先使用 EIP-6963 的 rdns：它由钱包扩展自己声明，跨重启稳定且唯一。
+        //
+        // 注意：注册表只在 getProviders() 里填充，而冷启动时那个调用可能还没跑，
+        // 直接读会拿到空对象并回退成 `metamask-0`，与存档里的 `eip6963:io.metamask`
+        // 不一致 —— 于是同一钱包被判成「已重启」并清档。因此这里必须自行收集，
+        // 不能依赖其他调用方先跑过。
+        try {
+          const registryKey = collectEip6963KeySync(eth);
+          if (registryKey) {
+            return { success: true, result: registryKey };
+          }
+        } catch {
+          // 注册表不可用时回退到 type-index
+        }
+
+        // 回退：同类型 provider 中的序号。序号基于 provider 列表顺序，
+        // 扩展集合不变时跨重启稳定（远好过 chainId/selectedAddress 快照）。
+        const sameType = providers.filter((provider: any) => detectType(provider) === type);
+        const index = sameType.indexOf(eth);
+        return { success: true, result: `${type}-${index >= 0 ? index : 0}` };
+
+        /**
+         * 同步解析当前 provider 对应的 EIP-6963 键。
+         * 注册表已有则直接匹配；为空则同步派发 requestProvider 事件，
+         * 钱包会在该事件的同步回调里 announce（EIP-6963 规范要求同步响应），
+         * 因此监听器内即可拿到 rdns，无需 await。
+         */
+        function collectEip6963KeySync(target: any): string | null {
+          const registry = ((window as any).__eip6963ProviderRegistry ||= {});
+
+          const findMatch = (): string | null => {
+            for (const key of Object.keys(registry)) {
+              if (key.startsWith('eip6963:') && registry[key] === target) {
+                return key;
+              }
+            }
+            return null;
+          };
+
+          const existing = findMatch();
+          if (existing) return existing;
+
+          // 同步收集：钱包对 requestProvider 的响应是同步 dispatch 的
+          const onAnnounce = (event: Event) => {
+            const detail = (event as CustomEvent).detail as
+              | { info?: { name?: string; rdns?: string; uuid?: string }; provider?: unknown }
+              | undefined;
+            if (!detail?.info || !detail.provider) return;
+            const idSeed = detail.info.rdns || detail.info.uuid || detail.info.name;
+            if (!idSeed) return;
+            registry[`eip6963:${idSeed}`] = detail.provider;
+          };
+
+          window.addEventListener('eip6963:announceProvider', onAnnounce as EventListener);
+          try {
+            // 给钱包一个重试机会（部分钱包异步 announce），随后同步收集
+            window.dispatchEvent(new Event('eip6963:requestProvider'));
+          } finally {
+            window.removeEventListener('eip6963:announceProvider', onAnnounce as EventListener);
+          }
+
+          return findMatch();
+        }
       },
     });
 

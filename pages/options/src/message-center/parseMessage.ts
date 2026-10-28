@@ -29,6 +29,8 @@
  * 解析失败时退回纯文本展示，不丢内容。
  */
 
+import { buildMessageSummary } from '@extension/shared';
+
 export interface ParsedReason {
   /** 结论行文本，如「DEX 流动性存在风险」 */
   text: string;
@@ -173,3 +175,15 @@ export const parseMessageContent = (content: string): ParsedMessage => {
 
   return { summary, coins, disclaimer };
 };
+
+/** 列表行摘要最大正文长度（按码点计，emoji 记 1 个） */
+export const ROW_SUMMARY_BODY_LIMIT = 30;
+
+/**
+ * 列表行副标题：正文首行（如「本轮 2 个币种触发风险：」）+ 其余行拍平后的前 30 字。
+ *
+ * 实现放在 @extension/shared，与 background 的系统通知共用同一个截断逻辑，
+ * 避免两处对「拍平/跳免责声明/码点截断」的规则各写一份而漂移。
+ */
+export const buildRowSummary = (content: string, limit = ROW_SUMMARY_BODY_LIMIT): string =>
+  buildMessageSummary(content, limit);

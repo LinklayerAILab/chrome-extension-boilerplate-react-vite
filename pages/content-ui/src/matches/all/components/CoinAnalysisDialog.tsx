@@ -98,7 +98,11 @@ export const CoinAnalysisDialog = memo(
           <div className="flex items-center gap-4 rounded-[8px] border-2 border-black bg-black p-[20px] text-white">
             <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-white text-[24px] font-bold text-black">
               {logo ? (
-                <img src={logo} alt={symbol} className="h-[60px] w-[60px] rounded-full object-cover" />
+                <img
+                  src={logo}
+                  alt={symbol}
+                  className="h-[60px] w-[60px] rounded-full border-[3px] border-solid border-[#CCFF00] object-cover"
+                />
               ) : (
                 symbol.slice(0, 2).toUpperCase()
               )}

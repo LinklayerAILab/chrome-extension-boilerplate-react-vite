@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@src/store';
 import { setPageInfo } from '@src/store/slices/pageInfoSlice';
-import { updateAllPageInfo } from '@src/store/slices/pageInfoSlice';
+import type { PageKey } from '@src/store/slices/pageInfoSlice';
 import type { Locale } from '@src/lib/i18n';
 import { locales } from '@src/lib/i18n';
 
@@ -14,7 +14,7 @@ import { locales } from '@src/lib/i18n';
  * @param pageKey - The page key in pageInfo store (e.g., 'alpha', 'api', 'earn', 'perps', 'poliet', 'points')
  * @param locale - Current locale for initial update
  */
-export const usePageInfoUpdate = (pageKey: keyof ReturnType<typeof locales> = 'en', locale?: Locale) => {
+export const usePageInfoUpdate = (pageKey: PageKey, locale?: Locale) => {
   const dispatch = useDispatch<AppDispatch>();
   const initializedRef = useRef(false);
 
@@ -69,34 +69,4 @@ export const usePageInfoUpdate = (pageKey: keyof ReturnType<typeof locales> = 'e
       window.removeEventListener('ChangeLanguage', handleLanguageChange);
     };
   }, [pageKey, locale, dispatch]);
-};
-
-/**
- * Alternative hook to update all page infos at once
- * Use this in your root component or a centralized location
- */
-export const usePageInfoUpdateAll = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { locale } = require('@src/lib/i18n').useI18n();
-
-  useEffect(() => {
-    const handleLanguageChange = (event: Event) => {
-      const customEvent = event as CustomEvent<{ locale: Locale }>;
-      const newLocale = customEvent.detail?.locale;
-
-      if (newLocale) {
-        console.log(`[usePageInfoUpdateAll] Language changed to ${newLocale}, updating all pageInfos`);
-
-        // 批量更新所有页面信息
-        const translatedInfo = updateAllPageInfo(newLocale);
-        dispatch(updateAllPageInfo(translatedInfo));
-      }
-    };
-
-    window.addEventListener('ChangeLanguage', handleLanguageChange);
-
-    return () => {
-      window.removeEventListener('ChangeLanguage', handleLanguageChange);
-    };
-  }, [dispatch]);
 };

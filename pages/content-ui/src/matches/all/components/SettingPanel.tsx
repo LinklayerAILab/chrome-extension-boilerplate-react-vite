@@ -680,7 +680,7 @@ const NotificationSwitch = () => {
   return (
     <div className="mb-2 flex items-center justify-between">
       <span>{t.settings.notifications}</span>
-      <Switch size="small" checked={!muted} disabled={loading} onChange={checked => handleToggle(checked)} />
+      <Switch checked={!muted} disabled={loading} onChange={checked => handleToggle(checked)} />
     </div>
   );
 };

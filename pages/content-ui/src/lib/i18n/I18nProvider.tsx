@@ -59,13 +59,33 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
 
       // 服务端 auto：本地有值用它，否则用浏览器语言
       const effective = localLocale ?? getBrowserLocale();
-      if (localLocale) syncLocale(localLocale);
+      const serverIsAuto = server?.locale === 'auto';
 
-      // 服务端尚未设置语言：把本地生效的语言传上去，让推送语言与界面一致。
-      // 首次推送后服务端变为 manual，之后的打开会走上面的分支，不会重复 PUT。
-      // server === null 表示未登录或请求失败，此时不写，避免把默认值误存进数据库。
-      if (server && server.locale === 'auto') {
-        void putGuardPushLang(effective);
+      /**
+       * 落盘时机：
+       * - 已有本地保存值：直接恢复，服务端仍为 auto 时再异步补同步
+       * - 首次使用（无本地值）：先把语言同步到服务端，**成功后才写本地**；
+       *   失败则保持原状，避免本地已生效、服务端却没记下，两边不一致
+       * - 未登录（server 为 null）且无本地值：不落盘，界面沿用浏览器语言
+       *
+       * 注意必须落盘：api/guard.ts 的 getGuardLocale() 读的是 localStorage，
+       * 若首次打开不写，界面显示浏览器语言而请求头会回退到别的值。
+       */
+      if (localLocale) {
+        syncLocale(localLocale);
+        if (serverIsAuto) void putGuardPushLang(localLocale);
+      } else if (serverIsAuto) {
+        const synced = await putGuardPushLang(effective);
+        if (synced) {
+          syncLocale(effective);
+          // 与 changeLocale 保持一致：chrome.storage 才是初始化时的读取源，
+          // 只写 localStorage 会导致下次打开仍读到空值、反复 PUT。
+          try {
+            await chrome.storage.local.set({ [STORAGE_KEY]: effective });
+          } catch (error) {
+            console.error('Failed to save locale to storage:', error);
+          }
+        }
       }
 
       setIsInitialized(true);

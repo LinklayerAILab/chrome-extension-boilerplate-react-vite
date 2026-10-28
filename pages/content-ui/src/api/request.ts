@@ -1,4 +1,5 @@
 import { ACCESS_TOKEN_KEY, ADDRESS_KEY, WEB_APP_DATA_KEY, LOCALE_KEY } from '@src/lib/storageKeys';
+import { getBrowserLocale } from '@src/lib/i18n';
 import { handleUnauthorizedSession } from '@src/lib/sessionCleanup';
 
 export interface StreamingRequestOptions {
@@ -58,10 +59,12 @@ export async function* streamingRequest<TResponse = SSEMessageEvent>(
   (config.headers as Headers).set('X-Accel-Buffering', 'no');
   (config.headers as Headers).set('Accept', 'text/event-stream');
 
-  const savedLocale = window.localStorage.getItem(LOCALE_KEY);
-  if (savedLocale) {
-    (config.headers as Headers).set('accept-language', savedLocale);
-  }
+  /**
+   * accept-language 与界面语言保持一致：优先用已持久化的语言，没有则回退浏览器语言。
+   * 首次打开插件、从未切过语言时 localStorage 可能为空，此时若直接不设头，
+   * 请求会带浏览器原始的 zh-CN,zh;q=0.9 等值，与界面语言未必一致。
+   */
+  (config.headers as Headers).set('accept-language', window.localStorage.getItem(LOCALE_KEY) || getBrowserLocale());
 
   // Add anti-cache timestamp
   urlObj.searchParams.set('_t', Date.now().toString());

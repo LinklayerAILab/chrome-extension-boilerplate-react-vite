@@ -22,6 +22,12 @@ export const Menus = ({ store }: MenusProps) => {
       selectIcon: ICONS.TOKEN_SELECT,
     },
     {
+      id: 5,
+      title: t.menus?.poliet || 'Poliet',
+      icon: ICONS.POLIET,
+      selectIcon: ICONS.POLIET_SELECT,
+    },
+    {
       id: 1,
       title: t.menus?.alpha || 'Alpha',
       icon: ICONS.ALPHA,
@@ -45,12 +51,6 @@ export const Menus = ({ store }: MenusProps) => {
       title: t.menus?.perps || 'Perps',
       icon: ICONS.PERPS,
       selectIcon: ICONS.PERPS_SELECT,
-    },
-    {
-      id: 5,
-      title: t.menus?.poliet || 'Poliet',
-      icon: ICONS.POLIET,
-      selectIcon: ICONS.POLIET_SELECT,
     },
     {
       id: 6,
