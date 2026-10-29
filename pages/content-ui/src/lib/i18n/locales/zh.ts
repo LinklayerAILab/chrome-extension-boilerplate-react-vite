@@ -290,6 +290,7 @@ export const zh: LocaleMessages = {
     analysisDisabled: '分析服务暂不可用',
     trialExpiredToast: '试用期已过',
     paidExpiredToast: '订阅失效',
+    watchSlotFull: '关注位已满，请先取消关注',
     cexLiquidity: 'CEX 流动性',
     dexLiquidity: 'DEX 流动性',
   },

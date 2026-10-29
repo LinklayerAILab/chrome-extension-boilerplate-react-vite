@@ -81,6 +81,40 @@ export const selectEntitlement = (state: GuardRootSlice): GuardEntitlement | nul
 export const selectPushSupported = (state: GuardRootSlice): boolean => state.guard.pushSupported;
 
 /**
+ * 前端试用档关注位上限。
+ *
+ * 后端 guard.entitlement.trial_max_tokens 仍是 10，产品口径已改为 3，
+ * 在后端配置同步前由前端统一收敛。同步后此值应删除，直接信任后端。
+ */
+export const TRIAL_WATCH_LIMIT = 3;
+
+export type WatchQuota = {
+  /** 已用关注位（不超过 max） */
+  current: number;
+  /** 当前档位的关注位上限 */
+  max: number;
+  /** 后端返回的已用数确实超过上限（防御性夹紧时置 true） */
+  capped: boolean;
+};
+
+/**
+ * 按权益状态解析关注位用量。
+ * paid_active 用后端上限（50）；其余档位取 min(后端上限, TRIAL_WATCH_LIMIT)。
+ * 返回 null 表示权益尚未加载。
+ */
+export const getWatchQuota = (entitlement: GuardEntitlement | null): WatchQuota | null => {
+  if (!entitlement) return null;
+  const max =
+    entitlement.status === 'paid_active'
+      ? entitlement.watchlist_max_tokens
+      : Math.min(entitlement.watchlist_max_tokens, TRIAL_WATCH_LIMIT);
+  const { watchlist_current: raw } = entitlement;
+  return { current: Math.min(raw, max), max, capped: raw > max };
+};
+
+export const selectWatchQuota = (state: GuardRootSlice): WatchQuota | null => getWatchQuota(state.guard.entitlement);
+
+/**
  * 静音中：muted_until 非空且晚于当前时刻。
  * 长期静音与横幅的 24h 临时静音共用这一个字段，仅时长不同。
  */
@@ -95,7 +129,7 @@ export const selectIsPushMuted = (state: GuardRootSlice): boolean => selectMuted
 
 /**
  * 推送资格 = 权益生效中(trial_active/paid_active) 且 未静音。
- * 注意：上限一律取 watchlist_max_tokens，禁止前端写死。
+ * 关注位上限统一走 getWatchQuota（唯一收敛点），不要在各组件里直接读字段。
  */
 export const selectCanReceivePush = (state: GuardRootSlice): boolean => {
   const entitlement = state.guard.entitlement;

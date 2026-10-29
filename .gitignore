@@ -23,6 +23,7 @@ tsconfig.tsbuildinfo
 **/.turbo
 # turbo watch 监视根包：仓库内的 dev 日志会被当成变更并重启所有任务
 .dev-server.log
+dev-watch.log
 
 # docs
 docs/任务需求.md

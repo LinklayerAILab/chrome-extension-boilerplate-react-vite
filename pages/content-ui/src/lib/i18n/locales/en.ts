@@ -290,6 +290,7 @@ export const en: LocaleMessages = {
     analysisDisabled: 'Analysis is temporarily unavailable',
     trialExpiredToast: 'Trial expired',
     paidExpiredToast: 'Subscription expired',
+    watchSlotFull: 'Watch slots are full. Unfollow one to add another.',
     cexLiquidity: 'CEX Liquidity',
     dexLiquidity: 'DEX Liquidity',
   },

@@ -10,6 +10,7 @@ import {
   refreshGuardEntitlement,
   selectEntitlement,
   selectPushSupported,
+  selectWatchQuota,
   setPushSupported,
 } from '@src/store/slices/guardSlice';
 
@@ -51,6 +52,8 @@ export const GuardEntitlementBar = memo(({ isOpen }: { isOpen: boolean }) => {
   const dispatch = useDispatch<AppDispatch>();
   const isLogin = useSelector((state: RootState) => state.user?.isLogin ?? false);
   const entitlement = useSelector(selectEntitlement);
+  /** 关注位用量（试用档收敛为 3，订阅档沿用后端上限） */
+  const quota = useSelector(selectWatchQuota);
   const pushSupported = useSelector(selectPushSupported);
   const [muteLoading, setMuteLoading] = useState(false);
 
@@ -131,9 +134,7 @@ export const GuardEntitlementBar = memo(({ isOpen }: { isOpen: boolean }) => {
 
       <span className="text-black/70">
         {tAny?.guard?.watchlistQuota ?? 'Watch slots'}{' '}
-        <span className="font-bold text-black">
-          {entitlement.watchlist_current} / {entitlement.watchlist_max_tokens}
-        </span>
+        <span className="font-bold text-black">{quota ? `${quota.current} / ${quota.max}` : '-'}</span>
       </span>
 
       {mutedUntil && (

@@ -7,7 +7,7 @@ import { useI18n } from '@src/lib/i18n';
 import { usePageInfoUpdate } from '@src/lib/hooks/usePageInfoUpdate';
 import { setOtherInfo, syncPoints } from '@src/store/slices/userSlice';
 import { setSelectedMenuId } from '@src/store/slices/uiSlice';
-import { refreshGuardEntitlement, selectEntitlement } from '@src/store/slices/guardSlice';
+import { refreshGuardEntitlement, selectEntitlement, selectWatchQuota } from '@src/store/slices/guardSlice';
 import { executeClaimFlow } from '../lib/claimLlax';
 
 /** 权益轮询间隔，与 GuardEntitlementBar 保持一致 */
@@ -61,6 +61,8 @@ export const AccountPage = ({
   const otherInfo = useSelector((state: RootState) => state.user.otherInfo);
   const isLogin = useSelector((state: RootState) => state.user?.isLogin ?? false);
   const entitlement = useSelector(selectEntitlement);
+  /** 关注位用量（试用档收敛为 3，订阅档沿用后端上限） */
+  const quota = useSelector(selectWatchQuota);
 
   const smallPeople = chrome.runtime.getURL('content-ui/smallPeople.svg');
   const smallMoney = chrome.runtime.getURL('content-ui/smallMoney.svg');
@@ -170,9 +172,9 @@ export const AccountPage = ({
   const walletReady = isConnected && Boolean(walletAddress);
 
   const quotaText = useMemo(() => {
-    if (!entitlement) return '--/--';
-    return `${entitlement.watchlist_current}/${entitlement.watchlist_max_tokens}`;
-  }, [entitlement]);
+    if (!quota) return '--/--';
+    return `${quota.current}/${quota.max}`;
+  }, [quota]);
 
   /**
    * 倒计时文案：按语种拼接单位。

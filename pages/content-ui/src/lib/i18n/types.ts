@@ -302,6 +302,7 @@ export interface LocaleMessages {
     analysisDisabled: string;
     trialExpiredToast: string;
     paidExpiredToast: string;
+    watchSlotFull: string;
     cexLiquidity: string;
     dexLiquidity: string;
   };

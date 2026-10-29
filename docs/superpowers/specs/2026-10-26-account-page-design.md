@@ -47,7 +47,7 @@
 | 3 | 头像（圆形）+ `Log out` 按钮 | `state.user.otherInfo.image` | 设计稿 |
 | 4 | My Points · 数值 | `state.user.points` | 设计稿：内嵌带边框子卡片 |
 | 5 | EVM Address · 数值 | `state.user.address`（`formatAddress`） | 同上 |
-| 6 | Watch Quota · 当前/上限 | `entitlement.watchlist_current` / `watchlist_max_tokens` | 同上 |
+| 6 | Watch Quota · 当前/上限 | `entitlement.watchlist_current` / `watchlist_max_tokens`（前端经 `getWatchQuota` 收敛：非 `paid_active` 档取 `min(后端上限, 3)`，后端 `trial_max_tokens` 待同步为 3） | 同上 |
 | 7 | Free Ends · 倒计时 | `entitlement.remaining_seconds` | 同上 |
 | 8 | 邀请人数 | `otherInfo.invite_count` | **旧样式原样** |
 | 9 | LLAx 余额 + Claim | `get_llax_balance()` + `executeClaimFlow` | **旧样式原样** |

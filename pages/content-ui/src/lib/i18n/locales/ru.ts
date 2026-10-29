@@ -291,6 +291,7 @@ export const ru: LocaleMessages = {
     analysisDisabled: 'Сервис анализа временно недоступен',
     trialExpiredToast: 'Период истёк',
     paidExpiredToast: 'Подписка истекла',
+    watchSlotFull: 'Слоты отслеживания заполнены. Сначала отпишитесь от одного',
     cexLiquidity: 'Ликвидность CEX',
     dexLiquidity: 'Ликвидность DEX',
   },

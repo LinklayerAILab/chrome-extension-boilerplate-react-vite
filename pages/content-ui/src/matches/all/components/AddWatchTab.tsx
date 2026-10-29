@@ -12,7 +12,7 @@ import {
   type GuardToken,
 } from '@src/api/guard';
 import { shouldPromptGuardPush } from '@src/lib/guardPush';
-import { refreshGuardEntitlement, selectIsPushMuted } from '@src/store/slices/guardSlice';
+import { refreshGuardEntitlement, selectIsPushMuted, selectWatchQuota } from '@src/store/slices/guardSlice';
 import { formatPrice, formatPriceFull, gainColor } from '@src/lib/display';
 import { TokenIcon } from './TokenIcon';
 import { PushPromptDialog } from './PushPromptDialog';
@@ -59,6 +59,8 @@ export const AddWatchTab = memo(({ isOpen, searchStr }: AddWatchTabProps) => {
   const isLogin = useSelector((state: RootState) => state.user?.isLogin ?? false);
   /** 用户已在设置面板/横幅里静音推送时，不再引导授权 */
   const isPushMuted = useSelector(selectIsPushMuted);
+  /** 关注位用量：试用档上限在前端收敛为 3，订阅档沿用后端上限 */
+  const quota = useSelector(selectWatchQuota);
 
   const [list, setList] = useState<WatchToken[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +202,15 @@ export const AddWatchTab = memo(({ isOpen, searchStr }: AddWatchTabProps) => {
           // 取关同样改变关注位用量，立即刷新权益
           void dispatch(refreshGuardEntitlement());
         } else {
+          /**
+           * 关注位已满：本地拦截，不发请求。
+           * 后端 trial_max_tokens 仍是 10，不能依赖它兜底 —— 否则界面会显示
+           * 「3/3 却还在增加」。取关分支不受影响（上面已处理 is_watched）。
+           */
+          if (quota && !quota.capped && quota.current >= quota.max) {
+            message.warning(tAny?.guard?.watchSlotFull || 'Watch slots are full');
+            return;
+          }
           const res = await addToWatchlist({ token_id: token.token_id });
           setList(prev =>
             prev.map(item =>
@@ -214,7 +225,7 @@ export const AddWatchTab = memo(({ isOpen, searchStr }: AddWatchTabProps) => {
           /**
            * 关注位用量与试用激活状态由后端计算（首次加币会激活 48h 试用），
            * 必须立即拉取权益，否则横幅要等 60 秒轮询才更新，
-           * 表现为「关注后仍显示 未激活 / 0 / 10」。
+           * 表现为「关注后仍显示 未激活 / 旧用量」。
            */
           void dispatch(refreshGuardEntitlement());
         }
@@ -224,7 +235,7 @@ export const AddWatchTab = memo(({ isOpen, searchStr }: AddWatchTabProps) => {
         setList(prev => prev.map(item => (item.token_id === token.token_id ? { ...item, loading: false } : item)));
       }
     },
-    [dispatch, isLogin, isPushMuted, tAny],
+    [dispatch, isLogin, isPushMuted, quota, tAny],
   );
 
   const skeletonRows = renderSkeletonRows();

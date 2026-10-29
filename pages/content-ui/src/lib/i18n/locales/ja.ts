@@ -291,6 +291,7 @@ export const ja: LocaleMessages = {
     analysisDisabled: '分析サービスは一時的に利用できません',
     trialExpiredToast: '体験終了',
     paidExpiredToast: 'サブスク終了',
+    watchSlotFull: 'ウォッチ枠が満杯です。先に1つ解除してください',
     cexLiquidity: 'CEX 流動性',
     dexLiquidity: 'DEX 流動性',
   },

@@ -290,6 +290,7 @@ export const ko: LocaleMessages = {
     analysisDisabled: '분석 서비스를 일시적으로 사용할 수 없습니다',
     trialExpiredToast: '체험 만료',
     paidExpiredToast: '구독 만료',
+    watchSlotFull: '관심 슬롯이 가득 찼습니다. 하나를 해제해 주세요',
     cexLiquidity: 'CEX 유동성',
     dexLiquidity: 'DEX 유동성',
   },

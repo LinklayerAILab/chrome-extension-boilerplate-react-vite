@@ -5,7 +5,7 @@ import { useI18n } from '@src/lib/i18n';
 import { Button, message } from '@src/ui';
 import { GUARD_PUSH_PROMPT_SKIPPED_KEY } from '@src/lib/storageKeys';
 import { enableGuardPush } from '@src/lib/guardPush';
-import { refreshGuardEntitlement, selectEntitlement } from '@src/store/slices/guardSlice';
+import { refreshGuardEntitlement, selectEntitlement, selectWatchQuota } from '@src/store/slices/guardSlice';
 import Dialog from './Dialog';
 
 /** RFC3339 → 本地时间字符串；解析失败时原样返回 */
@@ -29,6 +29,8 @@ export const PushPromptDialog = ({ isOpen, onClose }: PushPromptDialogProps) => 
   const tAny = t as unknown as Record<string, any>;
   const dispatch = useDispatch<AppDispatch>();
   const entitlement = useSelector(selectEntitlement);
+  /** 关注位用量（试用档收敛为 3，订阅档沿用后端上限） */
+  const quota = useSelector(selectWatchQuota);
   const [checking, setChecking] = useState(false);
 
   // 回调存 ref，避免父组件每次渲染产生的新函数身份触发重复探测
@@ -66,7 +68,7 @@ export const PushPromptDialog = ({ isOpen, onClose }: PushPromptDialogProps) => 
     }
   }, [dispatch, onClose, tAny]);
 
-  const quotaMax = entitlement?.watchlist_max_tokens;
+  const quotaMax = quota?.max;
 
   return (
     <Dialog isOpen={isOpen} onClose={handleLater}>
@@ -90,7 +92,7 @@ export const PushPromptDialog = ({ isOpen, onClose }: PushPromptDialogProps) => 
           <div className="flex justify-between gap-2">
             <span>{tAny?.guard?.watchlistQuota ?? 'Watch slots'}</span>
             <span className="font-bold">
-              {entitlement?.watchlist_current ?? 0} / {quotaMax ?? '-'}
+              {quota?.current ?? 0} / {quotaMax ?? '-'}
             </span>
           </div>
           {entitlement?.expires_at && (
